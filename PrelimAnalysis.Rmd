@@ -53,25 +53,23 @@ data %>%
 ```{r}
 missing_summary <- data %>%
   summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  pivot_longer(everything(), names_to = "variable", values_to = "missing_n") %>%
+  pivot_longer(everything(), names_to = "Variable name", values_to = "missing_n") %>%
   mutate(missing_pct = 100 * missing_n / nrow(data)) %>%
   arrange(desc(missing_pct))
 ```
 
 ```{r}
-# add description from data dictionary
+# add description, categories from data dictionary
 filename <- "Data dictionary_stats competition 2025_final.xlsx"
 data_dict <- read_excel(paste(path, filename, sep=""))
 
 # i noticed some mismatch in variable names 
 data_dict <- data_dict %>%
-  mutate(`Variable name` = ifelse(`Variable name` == "NTproBNP_peri_highest", 
-                                  "n_tpro_bnp_peri_highest", `Variable name`))
+  mutate(`Variable name` = ifelse(`Variable name` == "NTproBNP_peri_highest","n_tpro_bnp_peri_highest", `Variable name`))
 
 
 missing_summary <- missing_summary %>%
-  rename(`Variable name` = variable) %>%
-  left_join(data_dict %>% select(`Variable name`, Definition), by = "Variable name")
+  left_join(data_dict %>% select(`Variable name`, Definition, `Variable category`), by = "Variable name")
 
 write.csv(missing_summary, "missing_summary.csv")
 ```
@@ -82,3 +80,5 @@ write.csv(missing_summary, "missing_summary.csv")
 vis_miss(data[1:100, ]) +
   labs(title = "Missing Data Pattern (First 100 Rows)")
 ```
+
+
