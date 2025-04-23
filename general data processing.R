@@ -8,7 +8,10 @@ data <- read_excel(paste(path, filename, sep=""), sheet = "in")
 
 # load data dictionary
 filename <- "Data dictionary_stats competition 2025_final.xlsx"
-data_dict <- read_excel(paste(path, filename, sep=""))
+data_dict <- read_excel(filename)
+
+# rename some mismatched cols 
+data <- data %>% rename (obstructive_sleep_apnea_icd10=`obstructive _sleep_apnea_icd10`)
 
 # convert boolean variables to factors
 cat_vars <- data_dict %>%
@@ -21,4 +24,5 @@ for (var in cat_vars) {
   data_clean[[var]] <- as.factor(data_clean[[var]])
 }
 
-write.csv(data_clean, paste(path, 'cleaned_CSSC_data.csv', sep=""))
+write.csv(data_clean, paste(path, 'cleaned_CSSC_data.csv', sep=""), 
+          row.names = FALSE)
