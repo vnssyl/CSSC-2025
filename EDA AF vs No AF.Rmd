@@ -1,0 +1,49 @@
+---
+title: "EDA AF vs No AF"
+output: pdf_document
+---
+
+Load packages, data
+
+```{r}
+library(tidyverse)
+
+path <- "../"
+filename <- "cleaned_CSSC_data.csv"
+
+data_clean <- read.csv(paste(path, filename, sep=""))
+```
+
+Subset
+
+```{r}
+df_AF <- subset(data_clean, 
+                data_clean$outcome_afib_aflutter_new_post == 1)
+df_noAF <- subset(data_clean, 
+                  data_clean$outcome_afib_aflutter_new_post == 0)
+cat('Number of patients WITH event:', dim(df_AF)[1])
+cat('\nNumber of patients WITHOUT event:', dim(df_noAF)[1])
+
+er <- dim(df_AF)[1]/dim(data_clean)[1]
+cat('\nOverall event rate:', er)
+```
+
+Var: time to outcome
+
+```{r}
+AF_notime<- sum(is.na(df_AF$time_to_outcome_afib_aflutter_new_post))
+cat('Number of patients WITH AF event but no time to event:', AF_notime)
+
+noAF_notime <- sum(is.na(df_noAF$time_to_outcome_afib_aflutter_new_post))
+cat('\nNumber of patients WITHOUT AF event and no time to event:', noAF_notime)
+
+hist(df_AF$time_to_outcome_afib_aflutter_new_post,
+     col = 'cornflowerblue',
+     xlab = 'Time to AF (unknown timescale)',
+     main = 'Distribution of Time to AF',
+     breaks = 20)
+```
+```{r}
+
+```
+

@@ -16,6 +16,7 @@ library(pROC)
 library(ROCR)
 library(janitor)
 ```
+
 ```{r}
 path <- "../"
 filename <- "synthetic_data_stats_competition_2025_final.xlsx"
@@ -64,14 +65,13 @@ filename <- "Data dictionary_stats competition 2025_final.xlsx"
 data_dict <- read_excel(paste(path, filename, sep=""))
 
 # i noticed some mismatch in variable names 
-data_dict <- data_dict %>%
-  mutate(`Variable name` = ifelse(`Variable name` == "NTproBNP_peri_highest","n_tpro_bnp_peri_highest", `Variable name`))
+data_dict$`Variable name`[data_dict$`Variable name` == "n_tpro_bnp_peri_highest"] <- "NTproBNP_peri_highest"
 
 
 missing_summary <- missing_summary %>%
   left_join(data_dict %>% select(`Variable name`, Definition, `Variable category`), by = "Variable name")
 
-write.csv(missing_summary, "missing_summary.csv")
+write.csv(missing_summary, "missing_summary.csv", row.names = FALSE)
 ```
 
 
