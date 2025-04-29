@@ -1,0 +1,184 @@
+---
+title: "Data Cleaning"
+date: "2025-04-26"
+output: pdf_document
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+# -------------------------------
+# INSTALL & LOAD PACKAGES
+# -------------------------------
+library(data.table)
+library(readxl)
+library(fst)
+library(corrplot)
+library(survival)
+library(caret)
+library(gbm)
+```
+
+```{r data-cleaning, warning=FALSE, message=FALSE}
+# -------------------------------
+# STEP 1–4: LOAD AND SELECT DATA
+# -------------------------------
+data <- readxl::read_excel("C:\\Users\\johny\\OneDrive\\Desktop\\competition\\synthetic_data_stats_competition_2025_final (3).xlsx")
+data <- as.data.table(data)
+
+# Save & reload as fst for speed
+write_fst(data, "data.fst")
+data <- read_fst("data.fst", as.data.table = TRUE)
+
+# ------------------------
+# STEP 2: Calculate missing %
+# ------------------------
+missing_percent <- data[, lapply(.SD, function(x) sum(is.na(x)) / .N)]
+
+# ------------------------
+# STEP 3: Define outcome & important labs
+# ------------------------
+outcome_vars <- c(
+  "outcome_afib_aflutter_new_post",
+  "time_to_outcome_afib_aflutter_new_post",
+  "outcome_all_cause_death",
+  "time_to_outcome_all_cause_death",
+  "follow_up_duration"
+)
+
+drop_vars <- names(missing_percent)[
+  (unlist(missing_percent) >= 0.3) & 
+  !(names(missing_percent) %in% outcome_vars)
+]
+
+cat("Variables dropped:", drop_vars, "\n")
+
+# ------------------------
+# STEP 4: Keep final vars
+# ------------------------
+final_vars <- c("patient_id", outcome_vars, setdiff(names(data), drop_vars))
+data <- data[, ..final_vars]
+
+# ------------------------
+# STEP 5–6: Impute missing values (only columns that have missing)
+# ------------------------
+numeric_cols <- names(data)[sapply(data, is.numeric)]
+cor_matrix <- cor(data[, ..numeric_cols], use = "pairwise.complete.obs")
+
+for (col in names(data)) {
+  if (!any(is.na(data[[col]]))) next  # skip if no missing in this column
+  
+  if (col %in% numeric_cols) {
+    other_cols <- setdiff(numeric_cols, col)
+    cor_values <- abs(cor_matrix[col, other_cols])
+    max_cor <- max(cor_values, na.rm = TRUE)
+    best_predictor <- other_cols[which.max(cor_values)]
+    
+    if (max_cor > 0.7) {
+      # create model_data with distinct names
+      model_data <- data[!is.na(get(col)) & !is.na(get(best_predictor)),
+                         .(target = get(col), pred_val = get(best_predictor))]
+      if (nrow(model_data) > 10) {
+        model <- lm(target ~ pred_val, data = model_data)
+        missing_idx <- which(is.na(data[[col]]) & !is.na(data[[best_predictor]]))
+        data[missing_idx, (col) := predict(model, 
+                                  newdata = data.table(pred_val = data[[best_predictor]][missing_idx]))]
+      }
+    } 
+    
+    # If low correlation or not enough data, impute with mean
+    if (max_cor <= 0.7 || nrow(model_data) <= 10) {
+      mean_value <- mean(data[[col]], na.rm = TRUE)
+      data[is.na(get(col)), (col) := mean_value]
+    }
+    
+  } else {
+    # Categorical columns, impute with mode
+    mode_value <- names(sort(table(data[[col]]), decreasing = TRUE))[1]
+    data[is.na(get(col)), (col) := mode_value]
+  }
+}
+
+# ------------------------
+# STEP 7: Correct variable types
+# ------------------------
+for (col in names(data)) {
+  if (is.character(data[[col]])) next
+  if (is.numeric(data[[col]])) {
+    uniq_vals <- unique(na.omit(data[[col]]))
+    if (length(uniq_vals) == 2) {
+      data[, (col) := factor(data[[col]])]
+    } else {
+      data[, (col) := as.numeric(data[[col]])]
+    }
+  }
+}
+
+# ------------------------
+# STEP 8: Define survival time and event
+# ------------------------
+data[, event_afib := as.integer(outcome_afib_aflutter_new_post == 1)]
+data[, time_afib := fifelse(
+  outcome_afib_aflutter_new_post == 1,
+  time_to_outcome_afib_aflutter_new_post,
+  fifelse(
+    outcome_all_cause_death == 1,
+    time_to_outcome_all_cause_death,
+    follow_up_duration
+  )
+)]
+data <- data[!is.na(time_afib)]
+
+# ------------------------
+# STEP 10: Save survival-ready data
+# ------------------------
+write_fst(data, "C:\\Users\\johny\\OneDrive\\Desktop\\competition\\data_survival_ready_final.fst")
+```
+
+```{r}
+# ------------------------
+# STEP 11: Survival Boosting with GBM
+# ------------------------
+
+# Read your cleaned survival data
+data <- read_fst("C:\\Users\\johny\\OneDrive\\Desktop\\competition\\data_survival_ready_final.fst", as.data.table = TRUE)
+
+# Define predictors
+predictor_vars <- setdiff(
+  names(data),
+  c("patient_id", "event_afib", "time_afib", outcome_vars)
+)
+
+# Prepare a data.frame for gbm (must be regular data.frame, not data.table)
+boost_data <- as.data.frame(data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+
+# Fit gradient boosting Cox model
+set.seed(123)
+gbm_fit <- gbm(
+  formula = Surv(time_afib, event_afib) ~ .,
+  data = boost_data,
+  distribution = "coxph",
+  n.trees = 3000,
+  interaction.depth = 3,
+  shrinkage = 0.01,
+  bag.fraction = 0.7,
+  train.fraction = 0.8,
+  cv.folds = 5,
+  n.minobsinnode = 10,
+  verbose = FALSE
+)
+
+# Select the optimal number of trees
+best_iter <- gbm.perf(gbm_fit, method = "cv")
+
+# Display variable importance
+importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
+
+# Plot top 20 important variables
+barplot(
+  importance[1:20, "rel.inf"], 
+  names.arg = importance[1:20, "var"],
+  las = 2,
+  main = "Top 20 Variables (GBM Boosting)"
+)
+
+```
+
