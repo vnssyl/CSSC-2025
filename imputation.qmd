@@ -1,0 +1,86 @@
+---
+title: "data_cleanedv1"
+format: pdf
+editor: visual
+---
+
+```{r, warning=FALSE}
+library(readxl)
+library(dplyr)
+library(VIM)
+library(writexl)
+library(randomForestSRC)
+library(mice)
+```
+
+```{r}
+data0 <- read_excel("synthetic_data_stats_competition_2025_final (3).xlsx")
+```
+
+# Calculating proportions
+```{r}
+# Original dimensions
+original_dim <- dim(data0)
+original_dim_table <- data.frame(Metric = c("Rows", "Columns"),
+                                 Value = original_dim)
+print(original_dim_table, row.names = FALSE)
+
+# Calculate missing percentage for each column
+missing_pct <- sapply(data0, function(x) mean(is.na(x)))
+missing_pct_sorted <- sort(missing_pct, decreasing = TRUE)
+
+# Display missing percentage sorted
+missing_table <- data.frame(Variable = names(missing_pct_sorted),
+                            Missing_Percentage = round(missing_pct_sorted * 100, 2))
+print(missing_table, row.names = FALSE)
+
+# Filter variables with >30% missing
+vars_over_30 <- missing_table %>% filter(Missing_Percentage > 30)
+print(vars_over_30, row.names = FALSE)
+```
+
+# Dropping predictors with missingness >= 30% 
+```{r}
+# Cleaned
+data_clean <- data0[, missing_pct <= 0.3]
+cat("New dimensions after dropping columns:", dim(data_clean), "\n")
+cat("Number of predictors dropped due to missingness:", original_dim[2] - dim(data_clean)[2], "\n")
+```
+
+# Mean/Median/Mode imputation (change to other methods later if needed)
+```{r}
+# Function to impute numeric with median
+impute_median <- function(x) {
+  x[is.na(x)] <- median(x, na.rm = TRUE)
+  return(x)
+}
+
+# Function to impute categorical (character or factor) with mode
+impute_mode <- function(x) {
+  mode_val <- names(which.max(table(x)))
+  x[is.na(x)] <- mode_val
+  return(x)
+}
+# Apply intelligent imputation
+data_imputed_smart <- data_clean %>%
+  mutate(
+    across(where(is.numeric), impute_median),
+    across(where(is.character), impute_mode),
+    across(where(is.factor), impute_mode),
+    across(where(is.logical), impute_mode)  # If you have logical columns
+  )
+
+print(sum(is.na(data_imputed_smart)))
+```
+
+
+```{r}
+
+```
+
+
+# Random Survival Forest Model 
+```{r}
+
+
+```
