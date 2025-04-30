@@ -15,6 +15,7 @@ library(corrplot)
 library(survival)
 library(caret)
 library(gbm)
+library(survivalROC)
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
@@ -214,3 +215,25 @@ predicted_risk <- predict(gbm_fit, newdata = test_boost_data, n.trees = best_ite
 test_data[, predicted_risk := predicted_risk]
 ```
 
+
+#Performance Scores
+```{r}
+#Computing C-index
+c_index <- survConcordance(Surv(time_afib, event_afib) ~ predicted_risk, data = test_data)
+c_index_val <- c_index$concordance
+print(c_index_val)
+
+#Compute ROCAUC at 6 months
+eval_time <- 180
+roc_result <- survivalROC(
+  Stime = test_data$time_afib,
+  status = test_data$event_afib,
+  marker = test_data$predicted_risk,
+  predict.time = eval_time,
+  method = "NNE",
+  span = 0.25
+)
+
+cat("ROC AUC at", eval_time, "days:", round(roc_result$AUC, 3), "\n")
+
+```
