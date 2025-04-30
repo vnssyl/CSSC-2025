@@ -16,18 +16,20 @@ library(survival)
 library(caret)
 library(gbm)
 library(survivalROC)
+library(survcomp)
+library(purr)
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
 # -------------------------------
 # STEP 1–4: LOAD AND SELECT DATA
 # -------------------------------
-data <- readxl::read_excel("C:\\Users\\johny\\OneDrive\\Desktop\\competition\\synthetic_data_stats_competition_2025_final (3).xlsx")
+data <- readxl::read_excel("../synthetic_data_stats_competition_2025_final.xlsx")
 data <- as.data.table(data)
 
 # Save & reload as fst for speed
-write_fst(data, "data.fst")
-data <- read_fst("data.fst", as.data.table = TRUE)
+write_fst(data, "../data.fst")
+data <- read_fst("../data.fst", as.data.table = TRUE)
 
 # ------------------------
 # STEP 2: Calculate missing %
@@ -140,7 +142,65 @@ test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
 # ------------------------
 # STEP 9: Save survival-ready data
 # ------------------------
-write_fst(data, "C:\\Users\\johny\\OneDrive\\Desktop\\competition\\data_survival_ready_final.fst")
+write_fst(data, "../data_survival_ready_final.fst")
+```
+```{r}
+# Tuning
+param_grid <- expand.grid(
+  n.trees = c(1000, 2000, 3000),
+  interaction.depth = c(1, 3, 5),
+  shrinkage = c(0.01, 0.05),
+  bag.fraction = c(0.6, 0.8)
+)
+
+set.seed(123)
+folds <- sample(1:5, nrow(boost_data), replace = TRUE)
+
+
+# Function to evaluate one combo
+evaluate_combo <- function(params) {
+  cindexes <- numeric(5)
+
+  for (k in 1:5) {
+    train_idx <- which(folds != k)
+    test_idx <- which(folds == k)
+
+    train_data <- boost_data[train_idx, ]
+    test_data <- boost_data[test_idx, ]
+
+    model <- gbm(
+      formula = Surv(time_afib, event_afib) ~ .,
+      data = train_data,
+      distribution = "coxph",
+      n.trees = params$n.trees,
+      interaction.depth = params$interaction.depth,
+      shrinkage = params$shrinkage,
+      bag.fraction = params$bag.fraction,
+      train.fraction = 1.0,  # use full training fold
+      verbose = FALSE
+    )
+
+    pred <- predict(model, newdata = test_data, n.trees = params$n.trees, type = "link")
+
+    cindexes[k] <- concordance.index(
+      x = pred,
+      surv.time = test_data$time_afib,
+      surv.event = test_data$event_afib,
+      method = "noether"
+    )$c.index
+  }
+
+  mean(cindexes)
+}
+
+# Run the tuning
+param_grid$cindex <- pmap_dbl(param_grid, evaluate_combo)
+
+best_params <- param_grid %>%
+  arrange(desc(cindex)) %>%
+  slice(1)
+
+print(best_params)
 ```
 
 ```{r}
