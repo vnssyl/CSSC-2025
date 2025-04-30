@@ -43,7 +43,28 @@ hist(df_AF$time_to_outcome_afib_aflutter_new_post,
      main = 'Distribution of Time to AF',
      breaks = 20)
 ```
-```{r}
 
+For col with missing, want to see difference in proportion missing btwn AF+ and AF-
+
+```{r}
+missing_summary <- read.csv('missing_summary.csv')
+
+miss_vars <- missing_summary %>%
+  filter(missing_pct > 0) %>%
+  pull(Variable.name)
+
+AF_prop_missing <- c()
+noAF_prop_missing<- c()
+
+n_tot_AF <- dim(df_AF)[1]
+n_tot_noAF <- dim(df_noAF)[1]
+
+for (i in 1:length(miss_vars)){
+  var <- miss_vars[i]
+  AF_prop_missing[i] <- sum(is.na(df_AF[[var]]))/n_tot_AF
+  noAF_prop_missing[i] <- sum(is.na(df_noAF[[var]]))/n_tot_noAF
+}
+
+missing_comparison <- data.frame(miss_vars,AF_prop_missing,noAF_prop_missing)
 ```
 
