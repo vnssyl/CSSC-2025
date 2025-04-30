@@ -15,7 +15,6 @@ library(corrplot)
 library(survival)
 library(caret)
 library(gbm)
-library(survcomp)
 library(purr)
 ```
 
@@ -181,12 +180,8 @@ evaluate_combo <- function(params) {
 
     pred <- predict(model, newdata = test_data, n.trees = params$n.trees, type = "link")
 
-    cindexes[k] <- concordance.index(
-      x = pred,
-      surv.time = test_data$time_afib,
-      surv.event = test_data$event_afib,
-      method = "noether"
-    )$c.index
+    concord <- concordance(Surv(time_afib, event_afib) ~ pred, data = test_data)
+    cindexes[k] <- concord$concordance
   }
 
   mean(cindexes)
