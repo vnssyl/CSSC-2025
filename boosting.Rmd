@@ -18,6 +18,8 @@ library(gbm)
 library(survivalROC)
 library(survcomp)
 library(purr)
+
+library(survAUC) #For calculating C index
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
@@ -278,19 +280,39 @@ test_data[, predicted_risk := predicted_risk]
 
 #Performance Scores
 ```{r}
-#Computing C-index
-c_index <- survConcordance(Surv(time_afib, event_afib) ~ predicted_risk, data = test_data)
-c_index_val <- c_index$concordance
-print(c_index_val)
+#4 year
+eval_time <- 1480
 
-#Compute ROCAUC at 6 months
-eval_time <- 180
-roc_result <- survivalROC(
-  Stime = test_data$time_afib,
-  status = test_data$event_afib,
-  marker = test_data$predicted_risk,
-  predict.time = eval_time,
-  method = "NNE",
-  span = 0.25
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+auc_uno <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),    # training survival object
+  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
+  lpnew = lp_test,                          # predicted risk (linear predictor)
+  times = eval_time                         # time at which to evaluate
 )
+str(auc_uno)
+
+#5 year
+eval_time <- 1825
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+auc_uno <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),    # training survival object
+  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
+  lpnew = lp_test,                          # predicted risk (linear predictor)
+  times = eval_time                         # time at which to evaluate
+)
+str(auc_uno)
+
 ```
