@@ -58,7 +58,7 @@ final_vars <- c("patient_id", outcome_vars, setdiff(names(data), drop_vars))
 data <- data[, ..final_vars]
 
 # ------------------------
-# STEP 5–6: Impute missing values (only columns that have missing)
+# STEP 5: Impute missing values (only columns that have missing)
 # ------------------------
 numeric_cols <- names(data)[sapply(data, is.numeric)]
 cor_matrix <- cor(data[, ..numeric_cols], use = "pairwise.complete.obs")
@@ -98,7 +98,7 @@ for (col in names(data)) {
 }
 
 # ------------------------
-# STEP 7: Correct variable types
+# STEP 6: Correct variable types
 # ------------------------
 for (col in names(data)) {
   if (is.character(data[[col]])) next
@@ -113,7 +113,7 @@ for (col in names(data)) {
 }
 
 # ------------------------
-# STEP 8: Define survival time and event
+# STEP 7: Define survival time and event
 # ------------------------
 data[, event_afib := as.integer(outcome_afib_aflutter_new_post == 1)]
 data[, time_afib := fifelse(
@@ -128,29 +128,33 @@ data[, time_afib := fifelse(
 data <- data[!is.na(time_afib)]
 
 # ------------------------
-# STEP 10: Save survival-ready data
+# STEP 8: Train-Test Split (30% training, 70% testing)
+# ------------------------
+set.seed(123)
+train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
+train_data <- data[train_indices] # This one to feed into model
+test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
+
+
+# ------------------------
+# STEP 9: Save survival-ready data
 # ------------------------
 write_fst(data, "C:\\Users\\johny\\OneDrive\\Desktop\\competition\\data_survival_ready_final.fst")
 ```
 
 ```{r}
 # ------------------------
-# STEP 11: Survival Boosting with GBM
+# STEP 10: Survival Boosting with GBM
 # ------------------------
-
-# Read your cleaned survival data
-data <- read_fst("C:\\Users\\johny\\OneDrive\\Desktop\\competition\\data_survival_ready_final.fst", as.data.table = TRUE)
-
-# Define predictors
 predictor_vars <- setdiff(
   names(data),
   c("patient_id", "event_afib", "time_afib", outcome_vars)
 )
 
-# Prepare a data.frame for gbm (must be regular data.frame, not data.table)
-boost_data <- as.data.frame(data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+# Prepare data for training GBM
+boost_data <- as.data.frame(train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
 
-# Fit gradient boosting Cox model
+# Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
   formula = Surv(time_afib, event_afib) ~ .,
@@ -166,19 +170,47 @@ gbm_fit <- gbm(
   verbose = FALSE
 )
 
-# Select the optimal number of trees
+# Select best iteration using cross-validation
 best_iter <- gbm.perf(gbm_fit, method = "cv")
 
-# Display variable importance
+# Variable importance plot
 importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
-
-# Plot top 20 important variables
 barplot(
   importance[1:20, "rel.inf"], 
   names.arg = importance[1:20, "var"],
   las = 2,
   main = "Top 20 Variables (GBM Boosting)"
 )
+```
 
+```{r}
+# ------------------------
+# STEP 12: Variable Importance Table (Base R + data.table only)
+# ------------------------
+
+# Get importance from GBM
+importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
+
+# Convert to data.table
+importance_dt <- as.data.table(importance)
+setnames(importance_dt, c("var", "rel.inf"), c("Variable", "RelativeInfluence"))
+
+# Round values for readability
+importance_dt[, RelativeInfluence := round(RelativeInfluence, 2)]
+
+# Sort by importance descending
+importance_dt <- importance_dt[order(-RelativeInfluence)]
+
+# Print top 20 variables as a normal table
+print(importance_dt[1:20])
+
+```
+
+
+```{r}
+# Predict risk scores (linear predictor) on test set
+test_boost_data <- as.data.frame(test_data[, predictor_vars, with = FALSE])
+predicted_risk <- predict(gbm_fit, newdata = test_boost_data, n.trees = best_iter, type = "link")
+test_data[, predicted_risk := predicted_risk]
 ```
 
