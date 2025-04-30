@@ -15,13 +15,8 @@ library(corrplot)
 library(survival)
 library(caret)
 library(gbm)
-<<<<<<< HEAD
-=======
 library(survivalROC)
-library(survcomp)
->>>>>>> 312a85d68cf0579cfa1608ca51e81a62b0016029
 library(purr)
-
 library(survAUC) #For calculating C index
 ```
 
