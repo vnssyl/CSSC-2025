@@ -233,7 +233,4 @@ roc_result <- survivalROC(
   method = "NNE",
   span = 0.25
 )
-
-cat("ROC AUC at", eval_time, "days:", round(roc_result$AUC, 3), "\n")
-
 ```
