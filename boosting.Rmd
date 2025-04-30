@@ -15,7 +15,14 @@ library(corrplot)
 library(survival)
 library(caret)
 library(gbm)
+<<<<<<< HEAD
+=======
+library(survivalROC)
+library(survcomp)
+>>>>>>> 312a85d68cf0579cfa1608ca51e81a62b0016029
 library(purr)
+
+library(survAUC) #For calculating C index
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
@@ -269,3 +276,95 @@ predicted_risk <- predict(gbm_fit, newdata = test_boost_data, n.trees = best_ite
 test_data[, predicted_risk := predicted_risk]
 ```
 
+
+#Performance Scores
+```{r}
+#4 year
+eval_time <- 1480
+
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+auc_uno <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),    # training survival object
+  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
+  lpnew = lp_test,                          # predicted risk (linear predictor)
+  times = eval_time                         # time at which to evaluate
+)
+str(auc_uno)
+
+#5 year
+eval_time <- 1825
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+auc_uno <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),    # training survival object
+  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
+  lpnew = lp_test,                          # predicted risk (linear predictor)
+  times = eval_time                         # time at which to evaluate
+)
+str(auc_uno)
+
+#6 months
+eval_time <- 182
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+auc_uno <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),
+  Surv.rsp.new = Surv(T_test, delta_test),
+  lpnew = lp_test,
+  times = eval_time
+)
+str(auc_uno)
+```
+#Formatted nicer
+```{r}
+T_train <- train_data$time_afib
+delta_train <- train_data$event_afib
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+# 6-month AUC
+auc_6mo <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),
+  Surv.rsp.new = Surv(T_test, delta_test),
+  lpnew = lp_test,
+  times = 182
+)
+
+# 4-year AUC
+auc_4yr <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),
+  Surv.rsp.new = Surv(T_test, delta_test),
+  lpnew = lp_test,
+  times = 1480
+)
+
+# 5-year AUC
+auc_5yr <- AUC.uno(
+  Surv.rsp = Surv(T_train, delta_train),
+  Surv.rsp.new = Surv(T_test, delta_test),
+  lpnew = lp_test,
+  times = 1825
+)
+
+# Print AUC values
+cat("6-month AUC:", auc_6mo$auc, "\n")
+cat("4-year AUC:", auc_4yr$auc, "\n")
+cat("5-year AUC:", auc_5yr$auc, "\n")
+```
