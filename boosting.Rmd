@@ -16,20 +16,25 @@ library(survival)
 library(caret)
 library(gbm)
 library(survivalROC)
-library(purr)
+library(purrr)
 library(survAUC) #For calculating C index
+library(mice) # for imp
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
+path <- "../"
+filename <- "synthetic_data_stats_competition_2025_final.xlsx"
+
+
 # -------------------------------
 # STEP 1–4: LOAD AND SELECT DATA
 # -------------------------------
-data <- readxl::read_excel("../synthetic_data_stats_competition_2025_final.xlsx")
+data <- readxl::read_excel(paste0(path,filename, sep = ""))
 data <- as.data.table(data)
 
 # Save & reload as fst for speed
-write_fst(data, "../data.fst")
-data <- read_fst("../data.fst", as.data.table = TRUE)
+write_fst(data, paste0(path,"data.fst", sep = ""))
+data <- read_fst(paste0(path,"data.fst", sep = ""), as.data.table = TRUE)
 
 # ------------------------
 # STEP 2: Calculate missing %
@@ -57,48 +62,33 @@ cat("Variables dropped:", drop_vars, "\n")
 # ------------------------
 # STEP 4: Keep final vars
 # ------------------------
-final_vars <- c("patient_id", outcome_vars, setdiff(names(data), drop_vars))
+final_vars <- union(
+  union("patient_id", outcome_vars),
+  setdiff(names(data), drop_vars)
+)
+
 data <- data[, ..final_vars]
 
 # ------------------------
-# STEP 5: Impute missing values (only columns that have missing)
+# STEP 8: Train-Test Split (30% training, 70% testing)
 # ------------------------
-numeric_cols <- names(data)[sapply(data, is.numeric)]
-cor_matrix <- cor(data[, ..numeric_cols], use = "pairwise.complete.obs")
+set.seed(123)
+train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
+train_data <- data[train_indices] # This one to feed into model
+test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
 
-for (col in names(data)) {
-  if (!any(is.na(data[[col]]))) next  # skip if no missing in this column
-  
-  if (col %in% numeric_cols) {
-    other_cols <- setdiff(numeric_cols, col)
-    cor_values <- abs(cor_matrix[col, other_cols])
-    max_cor <- max(cor_values, na.rm = TRUE)
-    best_predictor <- other_cols[which.max(cor_values)]
-    
-    if (max_cor > 0.7) {
-      # create model_data with distinct names
-      model_data <- data[!is.na(get(col)) & !is.na(get(best_predictor)),
-                         .(target = get(col), pred_val = get(best_predictor))]
-      if (nrow(model_data) > 10) {
-        model <- lm(target ~ pred_val, data = model_data)
-        missing_idx <- which(is.na(data[[col]]) & !is.na(data[[best_predictor]]))
-        data[missing_idx, (col) := predict(model, 
-                                  newdata = data.table(pred_val = data[[best_predictor]][missing_idx]))]
-      }
-    } 
-    
-    # If low correlation or not enough data, impute with mean
-    if (max_cor <= 0.7 || nrow(model_data) <= 10) {
-      mean_value <- mean(data[[col]], na.rm = TRUE)
-      data[is.na(get(col)), (col) := mean_value]
-    }
-    
-  } else {
-    # Categorical columns, impute with mode
-    mode_value <- names(sort(table(data[[col]]), decreasing = TRUE))[1]
-    data[is.na(get(col)), (col) := mode_value]
-  }
-}
+
+
+# ------------------------
+# STEP 5: Impute missing values w PMM (only columns that have missing)
+# ------------------------
+set.seed(123)
+
+imputed_data <- mice(data, method = 'pmm', m = 5, maxit = 10)
+
+# retrieving first completed dataset, set as data.table
+data <- complete(imputed_data, 1)
+setDT(data)
 
 # ------------------------
 # STEP 6: Correct variable types
@@ -131,18 +121,9 @@ data[, time_afib := fifelse(
 data <- data[!is.na(time_afib)]
 
 # ------------------------
-# STEP 8: Train-Test Split (30% training, 70% testing)
-# ------------------------
-set.seed(123)
-train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
-train_data <- data[train_indices] # This one to feed into model
-test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
-
-
-# ------------------------
 # STEP 9: Save survival-ready data
 # ------------------------
-write_fst(data, "../data_survival_ready_final.fst")
+write_fst(data, paste0(path, "data_survival_ready_final.fst", sep = ""))
 ```
 ```{r}
 # Tuning
@@ -154,7 +135,7 @@ param_grid <- expand.grid(
 )
 
 set.seed(123)
-folds <- sample(1:5, nrow(boost_data), replace = TRUE)
+folds <- sample(1:5, nrow(train_data), replace = TRUE)
 
 
 # Function to evaluate one combo
@@ -162,15 +143,15 @@ evaluate_combo <- function(params) {
   cindexes <- numeric(5)
 
   for (k in 1:5) {
-    train_idx <- which(folds != k)
-    test_idx <- which(folds == k)
+    tune_train_idx <- which(folds != k)
+    tune_test_idx <- which(folds == k)
 
-    train_data <- boost_data[train_idx, ]
-    test_data <- boost_data[test_idx, ]
+    tune_train_data <- train_data[train_tune_train_idxidx, ]
+    tune_test_data <- train_data[tune_test_idx, ]
 
     model <- gbm(
       formula = Surv(time_afib, event_afib) ~ .,
-      data = train_data,
+      data = tune_train_data,
       distribution = "coxph",
       n.trees = params$n.trees,
       interaction.depth = params$interaction.depth,
@@ -180,9 +161,9 @@ evaluate_combo <- function(params) {
       verbose = FALSE
     )
 
-    pred <- predict(model, newdata = test_data, n.trees = params$n.trees, type = "link")
+    pred <- predict(model, newdata = tune_test_data, n.trees = params$n.trees, type = "link")
 
-    concord <- concordance(Surv(time_afib, event_afib) ~ pred, data = test_data)
+    concord <- concordance(Surv(time_afib, event_afib) ~ pred, data = tune_test_data)
     cindexes[k] <- concord$concordance
   }
 
@@ -242,7 +223,7 @@ barplot(
 
 ```{r}
 # ------------------------
-# STEP 12: Variable Importance Table (Base R + data.table only)
+# STEP 12: Variable Importance Table(Base R + data.table only)
 # ------------------------
 
 # Get importance from GBM
