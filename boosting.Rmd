@@ -70,28 +70,7 @@ final_vars <- union(
 data <- data[, ..final_vars]
 
 # ------------------------
-# STEP 8: Train-Test Split (30% training, 70% testing)
-# ------------------------
-set.seed(123)
-train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
-train_data <- data[train_indices] # This one to feed into model
-test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
-
-
-
-# ------------------------
-# STEP 5: Impute missing values w PMM (only columns that have missing)
-# ------------------------
-set.seed(123)
-
-imputed_data <- mice(data, method = 'pmm', m = 5, maxit = 10)
-
-# retrieving first completed dataset, set as data.table
-data <- complete(imputed_data, 1)
-setDT(data)
-
-# ------------------------
-# STEP 6: Correct variable types
+# STEP 5: Correct variable types
 # ------------------------
 for (col in names(data)) {
   if (is.character(data[[col]])) next
@@ -106,7 +85,7 @@ for (col in names(data)) {
 }
 
 # ------------------------
-# STEP 7: Define survival time and event
+# STEP 6: Define survival time and event
 # ------------------------
 data[, event_afib := as.integer(outcome_afib_aflutter_new_post == 1)]
 data[, time_afib := fifelse(
@@ -119,6 +98,28 @@ data[, time_afib := fifelse(
   )
 )]
 data <- data[!is.na(time_afib)]
+
+# ------------------------
+# STEP 7: Train-Test Split (30% training, 70% testing)
+# ------------------------
+set.seed(123)
+train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
+train_data <- data[train_indices] # This one to feed into model
+test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
+
+
+
+# ------------------------
+# STEP 8: Impute missing values w PMM on train data ONLY
+# ------------------------
+set.seed(123)
+
+imputed_data <- mice(train_data, method = 'pmm', m = 5, maxit = 10)
+
+# retrieving first completed dataset, set as data.table
+data <- complete(imputed_data, 1)
+setDT(train_data)
+
 
 # ------------------------
 # STEP 9: Save survival-ready data
