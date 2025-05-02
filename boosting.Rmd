@@ -127,6 +127,14 @@ setDT(train_data)
 write_fst(data, paste0(path, "data_survival_ready_final.fst", sep = ""))
 ```
 ```{r}
+predictor_vars <- setdiff(
+  names(data),
+  c("patient_id", "event_afib", "time_afib", outcome_vars)
+)
+
+# Prepare data for training GBM
+boost_data <- as.data.frame(train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+
 # Tuning
 param_grid <- expand.grid(
   n.trees = c(1000, 2000, 3000),
@@ -136,33 +144,33 @@ param_grid <- expand.grid(
 )
 
 set.seed(123)
-folds <- sample(1:5, nrow(train_data), replace = TRUE)
+folds <- sample(1:5, nrow(boost_data), replace = TRUE)
 
 
 # Function to evaluate one combo
-evaluate_combo <- function(params) {
+evaluate_combo <- function(n.trees, interaction.depth, shrinkage, bag.fraction) {
   cindexes <- numeric(5)
 
   for (k in 1:5) {
     tune_train_idx <- which(folds != k)
     tune_test_idx <- which(folds == k)
 
-    tune_train_data <- train_data[train_tune_train_idxidx, ]
-    tune_test_data <- train_data[tune_test_idx, ]
+    tune_train_data <- boost_data[tune_train_idx, ]
+    tune_test_data <- boost_data[tune_test_idx, ]
 
     model <- gbm(
       formula = Surv(time_afib, event_afib) ~ .,
       data = tune_train_data,
       distribution = "coxph",
-      n.trees = params$n.trees,
-      interaction.depth = params$interaction.depth,
-      shrinkage = params$shrinkage,
-      bag.fraction = params$bag.fraction,
-      train.fraction = 1.0,  # use full training fold
+      n.trees = n.trees,
+      interaction.depth = interaction.depth,
+      shrinkage = shrinkage,
+      bag.fraction = bag.fraction,
+      train.fraction = 1.0,
       verbose = FALSE
     )
 
-    pred <- predict(model, newdata = tune_test_data, n.trees = params$n.trees, type = "link")
+    pred <- predict(model, newdata = tune_test_data, n.trees = n.trees, type = "link")
 
     concord <- concordance(Surv(time_afib, event_afib) ~ pred, data = tune_test_data)
     cindexes[k] <- concord$concordance
