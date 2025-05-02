@@ -19,10 +19,11 @@ library(survivalROC)
 library(purrr)
 library(survAUC) #For calculating C index
 library(mice) # for imp
+library(glmnet)
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
-path <- "../"
+path <- "C:/Users/johny/OneDrive/Desktop/competition/"
 filename <- "synthetic_data_stats_competition_2025_final.xlsx"
 
 
@@ -126,6 +127,79 @@ setDT(train_data)
 # ------------------------
 write_fst(data, paste0(path, "data_survival_ready_final.fst", sep = ""))
 ```
+
+```{r}
+# ------------------------
+# STEP 10: Variable Selection with Cox Lasso (glmnet)
+# ------------------------
+
+library(glmnet)
+library(survival)
+library(data.table)
+
+data$time_afib[data$time_afib <= 0] <- 1e-8
+
+outcome_vars <- c(
+  "patient_id", "event_afib", "time_afib",
+  "outcome_afib_aflutter_new_post",
+  "time_to_outcome_afib_aflutter_new_post",
+  "outcome_all_cause_death",
+  "time_to_outcome_all_cause_death",
+  "follow_up_duration"
+)
+
+# Define predictor variables
+predictor_vars <- setdiff(names(data), outcome_vars)
+
+# Keep only numeric predictors
+numeric_check <- sapply(data[, predictor_vars], is.numeric)
+numeric_vars <- predictor_vars[numeric_check]
+
+# Create matrix for glmnet
+x <- as.matrix(data[, numeric_vars])
+y <- Surv(time = data$time_afib, event = data$event_afib)
+
+# Initialize storage for all selected variables
+selected_all <- c()
+
+# Run Lasso Cox 5 times
+set.seed(123)
+for (i in 1:5) {
+  x <- as.matrix(data[, numeric_vars])
+  y <- Surv(time = data$time_afib, event = data$event_afib)
+  
+  lasso_fit <- cv.glmnet(x, y, family = "cox", alpha = 1)
+  coef_matrix <- coef(lasso_fit, s = lasso_fit$lambda.min)
+  selected_vars <- rownames(coef_matrix)[which(coef_matrix != 0)]
+  
+  cat(paste("Run", i, "- Selected variables:\n"))
+  print(selected_vars)
+  
+  selected_all <- c(selected_all, selected_vars)
+}
+
+# Create data frame of frequencies
+selected_df <- as.data.frame(table(selected_all))
+colnames(selected_df) <- c("Variable", "Frequency")
+selected_df <- selected_df[order(-selected_df$Frequency), ]
+
+# Show data frame
+print(selected_df)
+
+# Plot histogram
+barplot(
+  selected_df$Frequency,
+  names.arg = selected_df$Variable,
+  las = 2,
+  col = "skyblue",
+  main = "Variable Selection Frequency (5 Lasso Runs)",
+  ylab = "Selection Count",
+  cex.names = 0.7
+)
+
+```
+
+
 ```{r}
 predictor_vars <- setdiff(
   names(data),
@@ -204,7 +278,7 @@ boost_data <- as.data.frame(train_data[, c("time_afib", "event_afib", predictor_
 # Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
-  formula = Surv(time_afib, event_afib) ~ .,
+  formula = Surv(time_afib, event_afib) ~ demographics_age_index_ecg + creatinine_peri + ecg_resting_qtc + hgb_peri + rdw_peri + chloride_peri + ecg_resting_hr + ecg_resting_pr + plt_peri + potassium_peri + sodium_peri + wbc_peri,
   data = boost_data,
   distribution = "coxph",
   n.trees = 3000,
@@ -316,7 +390,7 @@ auc_uno <- AUC.uno(
 )
 str(auc_uno)
 ```
-#Formatted nicer
+# Formatted nicer
 ```{r}
 T_train <- train_data$time_afib
 delta_train <- train_data$event_afib
