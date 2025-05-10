@@ -23,7 +23,7 @@ library(glmnet)
 ```
 
 ```{r data-cleaning, warning=FALSE, message=FALSE}
-path <- "C:/Users/johny/OneDrive/Desktop/competition/"
+path <- "../"
 filename <- "synthetic_data_stats_competition_2025_final.xlsx"
 
 
@@ -100,11 +100,15 @@ data[, time_afib := fifelse(
 )]
 data <- data[!is.na(time_afib)]
 
+# Variable Selection
+
+
+
 # ------------------------
-# STEP 7: Train-Test Split (30% training, 70% testing)
+# STEP 7: Train-Test Split (70% training, 30% testing)
 # ------------------------
 set.seed(123)
-train_indices <- sample(seq_len(nrow(data)), size = 0.3 * nrow(data))
+train_indices <- sample(seq_len(nrow(data)), size = 0.7 * nrow(data))
 train_data <- data[train_indices] # This one to feed into model
 test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
 
@@ -198,7 +202,6 @@ barplot(
 )
 
 ```
-
 
 ```{r}
 predictor_vars <- setdiff(
