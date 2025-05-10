@@ -133,6 +133,12 @@ barplot(
 selected_data <- imputed_train_data[ , names(imputed_train_data) %in% selected_all]
 
 # write prepared train and test data
+<<<<<<< HEAD
 write_fst(imputed_train_data, paste0(path, "imputed_train_data.fst", sep = ""))
 write_fst(selected_data, paste0(path, "selected_imputed_train_data.fst", sep = ""))
 write_fst(test_data, paste0(path, "test_data.fst", sep = ""))
+=======
+write_fst(imputed_train_data, paste0(path, "imputed_train_data", sep = ""))
+write_fst(selected_data, paste0(path, "selected_imputed_train_data", sep = ""))
+write_fst(test_data, paste0(path, "test_data", sep = ""))
+>>>>>>> f54bff54074fa62cae902ffbf06867c6510ac351
