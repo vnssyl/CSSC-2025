@@ -22,127 +22,24 @@ library(mice) # for imp
 library(glmnet)
 ```
 
-```{r data-cleaning, warning=FALSE, message=FALSE}
+```{r}
 path <- "../"
-filename <- "synthetic_data_stats_competition_2025_final.xlsx"
 
+# imputed train data
+filename <- "imputed_train_data.fst"
+imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
 
-# -------------------------------
-# STEP 1–4: LOAD AND SELECT DATA
-# -------------------------------
-data <- readxl::read_excel(paste0(path,filename, sep = ""))
-data <- as.data.table(data)
+filename <- "selected_imputed_train_data.fst"
+selected_train_data <- read_fst(paste0(path, filename, sep = ""))
 
-# Save & reload as fst for speed
-write_fst(data, paste0(path,"data.fst", sep = ""))
-data <- read_fst(paste0(path,"data.fst", sep = ""), as.data.table = TRUE)
-
-# ------------------------
-# STEP 2: Calculate missing %
-# ------------------------
-missing_percent <- data[, lapply(.SD, function(x) sum(is.na(x)) / .N)]
-
-# ------------------------
-# STEP 3: Define outcome & important labs
-# ------------------------
-outcome_vars <- c(
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
-)
-
-drop_vars <- names(missing_percent)[
-  (unlist(missing_percent) >= 0.3) & 
-  !(names(missing_percent) %in% outcome_vars)
-]
-
-cat("Variables dropped:", drop_vars, "\n")
-
-# ------------------------
-# STEP 4: Keep final vars
-# ------------------------
-final_vars <- union(
-  union("patient_id", outcome_vars),
-  setdiff(names(data), drop_vars)
-)
-
-data <- data[, ..final_vars]
-
-# ------------------------
-# STEP 5: Correct variable types
-# ------------------------
-for (col in names(data)) {
-  if (is.character(data[[col]])) next
-  if (is.numeric(data[[col]])) {
-    uniq_vals <- unique(na.omit(data[[col]]))
-    if (length(uniq_vals) == 2) {
-      data[, (col) := factor(data[[col]])]
-    } else {
-      data[, (col) := as.numeric(data[[col]])]
-    }
-  }
-}
-
-# ------------------------
-# STEP 6: Define survival time and event
-# ------------------------
-data[, event_afib := as.integer(outcome_afib_aflutter_new_post == 1)]
-data[, time_afib := fifelse(
-  outcome_afib_aflutter_new_post == 1,
-  time_to_outcome_afib_aflutter_new_post,
-  fifelse(
-    outcome_all_cause_death == 1,
-    time_to_outcome_all_cause_death,
-    follow_up_duration
-  )
-)]
-data <- data[!is.na(time_afib)]
-
-# Variable Selection
-
-
-
-# ------------------------
-# STEP 7: Train-Test Split (70% training, 30% testing)
-# ------------------------
-set.seed(123)
-train_indices <- sample(seq_len(nrow(data)), size = 0.7 * nrow(data))
-train_data <- data[train_indices] # This one to feed into model
-test_data <- data[-train_indices] # Use this one for AUC, C-index, etc
-
-
-
-# ------------------------
-# STEP 8: Impute missing values w PMM on train data ONLY
-# ------------------------
-set.seed(123)
-
-imputed_data <- mice(train_data, method = 'pmm', m = 5, maxit = 10)
-
-# retrieving first completed dataset, set as data.table
-data <- complete(imputed_data, 1)
-setDT(train_data)
-
-
-# ------------------------
-# STEP 9: Save survival-ready data
-# ------------------------
-write_fst(data, paste0(path, "data_survival_ready_final.fst", sep = ""))
+# test data
+filename <- "test_data.fst"
+test_data <- read_fst(paste0(path, filename, sep = ""))
 ```
 
+# Hyperparameter Tuning (!!!!!!)
+
 ```{r}
-# ------------------------
-# STEP 10: Variable Selection with Cox Lasso (glmnet)
-# ------------------------
-
-library(glmnet)
-library(survival)
-library(data.table)
-
-data$time_afib[data$time_afib <= 0] <- 1e-8
-
 outcome_vars <- c(
   "patient_id", "event_afib", "time_afib",
   "outcome_afib_aflutter_new_post",
@@ -152,58 +49,6 @@ outcome_vars <- c(
   "follow_up_duration"
 )
 
-# Define predictor variables
-predictor_vars <- setdiff(names(data), outcome_vars)
-
-# Keep only numeric predictors
-numeric_check <- sapply(data[, predictor_vars], is.numeric)
-numeric_vars <- predictor_vars[numeric_check]
-
-# Create matrix for glmnet
-x <- as.matrix(data[, numeric_vars])
-y <- Surv(time = data$time_afib, event = data$event_afib)
-
-# Initialize storage for all selected variables
-selected_all <- c()
-
-# Run Lasso Cox 5 times
-set.seed(123)
-for (i in 1:5) {
-  x <- as.matrix(data[, numeric_vars])
-  y <- Surv(time = data$time_afib, event = data$event_afib)
-  
-  lasso_fit <- cv.glmnet(x, y, family = "cox", alpha = 1)
-  coef_matrix <- coef(lasso_fit, s = lasso_fit$lambda.min)
-  selected_vars <- rownames(coef_matrix)[which(coef_matrix != 0)]
-  
-  cat(paste("Run", i, "- Selected variables:\n"))
-  print(selected_vars)
-  
-  selected_all <- c(selected_all, selected_vars)
-}
-
-# Create data frame of frequencies
-selected_df <- as.data.frame(table(selected_all))
-colnames(selected_df) <- c("Variable", "Frequency")
-selected_df <- selected_df[order(-selected_df$Frequency), ]
-
-# Show data frame
-print(selected_df)
-
-# Plot histogram
-barplot(
-  selected_df$Frequency,
-  names.arg = selected_df$Variable,
-  las = 2,
-  col = "skyblue",
-  main = "Variable Selection Frequency (5 Lasso Runs)",
-  ylab = "Selection Count",
-  cex.names = 0.7
-)
-
-```
-
-```{r}
 predictor_vars <- setdiff(
   names(data),
   c("patient_id", "event_afib", "time_afib", outcome_vars)
@@ -266,17 +111,28 @@ best_params <- param_grid %>%
 print(best_params)
 ```
 
+# Fitting Model (!!!! i used imputed train data not selected for now)
+
 ```{r}
 # ------------------------
 # STEP 10: Survival Boosting with GBM
 # ------------------------
 predictor_vars <- setdiff(
-  names(data),
+  names(imputed_train_data),
   c("patient_id", "event_afib", "time_afib", outcome_vars)
 )
 
+outcome_vars <- c(
+  "patient_id", "event_afib", "time_afib",
+  "outcome_afib_aflutter_new_post",
+  "time_to_outcome_afib_aflutter_new_post",
+  "outcome_all_cause_death",
+  "time_to_outcome_all_cause_death",
+  "follow_up_duration"
+)
+
 # Prepare data for training GBM
-boost_data <- as.data.frame(train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+boost_data <- as.data.frame(imputed_train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
 
 # Fit GBM Cox model
 set.seed(123)
