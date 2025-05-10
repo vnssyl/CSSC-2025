@@ -63,7 +63,11 @@ data[, time_afib := fifelse(
 data <- data[!is.na(time_afib)]
 
 # variable selection
-data$time_afib[data$time_afib <= 0] <- 1e-8
+data <- as.data.frame(data)
+imputed_data <- mice(data, method = 'pmm', m = 5, maxit = 10)
+imputed_data <- complete(imputed_data, 1)
+
+data$time_afib[imputed_data$time_afib <= 0] <- 1e-8
 
 outcome_vars <- c(
   "patient_id", "event_afib", "time_afib",
@@ -75,16 +79,12 @@ outcome_vars <- c(
 )
 
 ## Define predictor variables
-data <- as.data.frame(data)
-predictor_vars <- setdiff(names(data), outcome_vars)
+imputed_data <- as.data.frame(imputed_data)
+predictor_vars <- setdiff(names(imputed_data), outcome_vars)
 
 ## Keep only numeric predictors
-numeric_check <- sapply(data[, predictor_vars, drop = FALSE], is.numeric)
+numeric_check <- sapply(imputed_data[, predictor_vars, drop = FALSE], is.numeric)
 numeric_vars <- predictor_vars[numeric_check]
-
-# Create design matrix for glmnet
-x <- as.matrix(data[, numeric_vars, drop = FALSE])
-y <- Surv(time = data$time_afib, event = data$event_afib)
 
 ## Initialize storage for all selected variables
 selected_all <- c()
@@ -92,8 +92,8 @@ selected_all <- c()
 ## Run Lasso Cox 5 times
 set.seed(123)
 for (i in 1:5) {
-  x <- as.matrix(data[, numeric_vars])
-  y <- Surv(time = data$time_afib, event = data$event_afib)
+  x <- as.matrix(imputed_data[, numeric_vars])
+  y <- Surv(time = imputed_data$time_afib, event = imputed_data$event_afib)
   
   lasso_fit <- cv.glmnet(x, y, family = "cox", alpha = 1)
   coef_matrix <- coef(lasso_fit, s = lasso_fit$lambda.min)
@@ -125,17 +125,17 @@ barplot(
 )
 
 # train test split (70% train 30%)
+selected_data <- data[ , names(data) %in% selected_all]
+
 set.seed(123)
-train_indices <- sample(seq_len(nrow(selected_df)), size = 0.7 * nrow(selected_df))
-train_data <- selected_df[train_indices] # This one to feed into model
-test_data <- selected_df[-train_indices] # Use this one for AUC, C-index, etc
+train_indices <- sample(seq_len(nrow(selected_data)), size = 0.7 * nrow(selected_data))
+train_data <- selected_data[train_indices] # This one to feed into model
+test_data <- selected_data[-train_indices] # Use this one for AUC, C-index, etc
 
 # impute on train data
 set.seed(123)
-imputed_data <- mice(train_data, method = 'pmm', m = 5, maxit = 10)
-data <- complete(imputed_data, 1)
-setDT(train_data)
+imputed_train_data <- mice(train_data, method = 'pmm', m = 5, maxit = 10)
 
 # write prepared train and test data
-write_fst(train_data, paste0(path, "train_data", sep = ""))
+write_fst(imputed_train_data, paste0(path, "train_data", sep = ""))
 write_fst(test_data, paste0(path, "test_data", sep = ""))
