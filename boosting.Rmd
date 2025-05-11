@@ -117,6 +117,16 @@ print(best_params)
 # ------------------------
 # STEP 10: Survival Boosting with GBM
 # ------------------------
+
+outcome_vars <- c(
+  "patient_id", "event_afib", "time_afib",
+  "outcome_afib_aflutter_new_post",
+  "time_to_outcome_afib_aflutter_new_post",
+  "outcome_all_cause_death",
+  "time_to_outcome_all_cause_death",
+  "follow_up_duration"
+)
+
 predictor_vars <- setdiff(
   names(imputed_train_data),
   c("patient_id", "event_afib", "time_afib", outcome_vars)
@@ -132,7 +142,7 @@ outcome_vars <- c(
 )
 
 # Prepare data for training GBM
-boost_data <- as.data.frame(imputed_train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+boost_data <- as.data.frame(imputed_train_data[, c("time_afib", "event_afib", predictor_vars)])
 
 # Fit GBM Cox model
 set.seed(123)
@@ -200,8 +210,8 @@ test_data[, predicted_risk := predicted_risk]
 #4 year
 eval_time <- 1480
 
-T_train <- train_data$time_afib
-delta_train <- train_data$event_afib
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
 
 T_test <- test_data$time_afib
 delta_test <- test_data$event_afib
@@ -217,8 +227,8 @@ str(auc_uno)
 
 #5 year
 eval_time <- 1825
-T_train <- train_data$time_afib
-delta_train <- train_data$event_afib
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
 
 T_test <- test_data$time_afib
 delta_test <- test_data$event_afib
@@ -234,8 +244,8 @@ str(auc_uno)
 
 #6 months
 eval_time <- 182
-T_train <- train_data$time_afib
-delta_train <- train_data$event_afib
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
 
 T_test <- test_data$time_afib
 delta_test <- test_data$event_afib
@@ -251,8 +261,8 @@ str(auc_uno)
 ```
 # Formatted nicer
 ```{r}
-T_train <- train_data$time_afib
-delta_train <- train_data$event_afib
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
 T_test <- test_data$time_afib
 delta_test <- test_data$event_afib
 lp_test <- test_data$predicted_risk
