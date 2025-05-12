@@ -132,17 +132,9 @@ predictor_vars <- setdiff(
   c("patient_id", "event_afib", "time_afib", outcome_vars)
 )
 
-outcome_vars <- c(
-  "patient_id", "event_afib", "time_afib",
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
-)
 
 # Prepare data for training GBM
-boost_data <- as.data.frame(imputed_train_data[, c("time_afib", "event_afib", predictor_vars)])
+boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
 # Fit GBM Cox model
 set.seed(123)
@@ -199,9 +191,9 @@ print(importance_dt[1:20])
 
 ```{r}
 # Predict risk scores (linear predictor) on test set
-test_boost_data <- as.data.frame(test_data[, predictor_vars, with = FALSE])
+test_boost_data <- as.data.frame(test_data[, predictor_vars], with = FALSE)
 predicted_risk <- predict(gbm_fit, newdata = test_boost_data, n.trees = best_iter, type = "link")
-test_data[, predicted_risk := predicted_risk]
+test_data$predicted_risk <- predicted_risk
 ```
 
 
