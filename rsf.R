@@ -16,8 +16,10 @@ train_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/imputed_train
 
 train_data <- as.data.frame(train_data[,7:114])
 
+# this one works
+obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
 
-obj <- rfsrc(Surv(time_afib,event_afib)~., train_data,
+obj2 <- rfsrc(Surv(time_afib,event_afib)~., train_data,
              ntree = 100, nodesize = 5, nsplit = 50, importance = TRUE)
 
 print(obj)
