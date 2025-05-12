@@ -16,13 +16,16 @@ train_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/imputed_train
 
 train_data <- as.data.frame(train_data[,7:114])
 
-# this one works
+# c index = 0.02925672
 obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
-
-obj2 <- rfsrc(Surv(time_afib,event_afib)~., train_data,
-             ntree = 100, nodesize = 5, nsplit = 50, importance = TRUE)
-
 print(obj)
+
+
+# c index = 0.02808606
+obj2 <- rfsrc(Surv(time_afib,event_afib)~., train_data,
+             ntree = 1000, nodesize = 5, nsplit = 50)
+print(obj2)
+
 
 # c index
 get.cindex(obj$yvar[,1], obj$yvar[,2], obj$predicted.oob)
