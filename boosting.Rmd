@@ -288,3 +288,26 @@ cat("6-month AUC:", auc_6mo$auc, "\n")
 cat("4-year AUC:", auc_4yr$auc, "\n")
 cat("5-year AUC:", auc_5yr$auc, "\n")
 ```
+
+# This is ROC-AUC similar to what was reported in the papers
+```{r}
+test_data$binary_afib_6mo <- NA
+
+for (i in 1:nrow(test_data)) {
+  time_to_afib <- test_data$time_afib[i]
+  afib_event <- test_data$event_afib[i]
+  
+  if (time_to_afib <= 182 && afib_event == 1) {
+    test_data$binary_afib_6mo[i] <- 1
+  } else {
+    test_data$binary_afib_6mo[i] <- 0
+  }
+}
+
+roc_obj <- roc(response = test_data$binary_afib_6mo,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+auc_val <- auc(roc_obj)
+print(auc_val)
+```
