@@ -50,7 +50,9 @@ plot(jk.obj, xlab = "Variable Importance (x 100)", cex = 1.2)
 
 # Predict risk scores (linear predictor) on test set
 o.pred <- predict(obj, newdata = test_data)
-test_data$predicted_risk <- o.pred$predicted
+cc <- complete.cases(test_data)
+test_data$predicted_risk <- NA      # initialize
+test_data$predicted_risk[cc] <- o.pred$predicted
 
 test_data$binary_afib_6mo <- NA
 
@@ -71,5 +73,3 @@ roc_obj <- roc(response = test_data$binary_afib_6mo,
 
 auc_val <- auc(roc_obj)
 print(auc_val)
-
-
