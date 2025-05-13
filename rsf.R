@@ -25,10 +25,23 @@ obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
 
 print(obj)
 
+# Sample size: 74722
+# Number of deaths: 4512
+# Number of trees: 500
+# Forest terminal node size: 15
+# Average no. of terminal nodes: 907.582
+# No. of variables tried at each split: 11
+# Total no. of variables: 106
+# Resampling used to grow trees: swor
+# Resample size used to grow trees: 47224
+# Analysis: RSF
+# Family: surv
+# Splitting rule: logrank *random*
+#   Number of random split points: 10
+# (OOB) CRPS: 103.15390764
+# (OOB) stand. CRPS: 0.02055268
+# (OOB) Requested performance error: 0.02901516
 
-obj2 <- rfsrc(Surv(time_afib,event_afib)~., train_data,
-             ntree = 1000, nodesize = 5, nsplit = 50)
-print(obj2)
 
 
 
