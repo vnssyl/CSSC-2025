@@ -17,14 +17,15 @@ train_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/imputed_train
 test_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/test_data.fst")
 
 
-train_data <- as.data.frame(train_data[,7:114])
+
+test_data <- as.data.frame(test_data[, 7:114], with = FALSE)
+
+train_data <- as.data.frame(train_data[,7:114], with = FALSE)
 
 
 obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
 
-
-print(obj)
-
+# print(obj)
 # Sample size: 74722
 # Number of deaths: 4512
 # Number of trees: 500
@@ -61,12 +62,17 @@ plot(jk.obj, xlab = "Variable Importance (x 100)", cex = 1.2)
 
 
 
+
+
+
 # Predict risk scores (linear predictor) on test set
 o.pred <- predict(obj, newdata = test_data)
 cc <- complete.cases(test_data)
 test_data$predicted_risk <- NA      # initialize
 test_data$predicted_risk[cc] <- o.pred$predicted
 
+
+# 6 month AUC = 0.9802
 test_data$binary_afib_6mo <- NA
 
 for (i in 1:nrow(test_data)) {
@@ -81,6 +87,50 @@ for (i in 1:nrow(test_data)) {
 }
 
 roc_obj <- roc(response = test_data$binary_afib_6mo,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+auc_val <- auc(roc_obj)
+print(auc_val)
+
+
+# 4 year AUC = 0.9891
+test_data$binary_afib_4yr <- NA
+
+for (i in 1:nrow(test_data)) {
+  time_to_afib <- test_data$time_afib[i]
+  afib_event <- test_data$event_afib[i]
+  
+  if (time_to_afib <= 1480 && afib_event == 1) {
+    test_data$binary_afib_4yr[i] <- 1
+  } else {
+    test_data$binary_afib_4yr[i] <- 0
+  }
+}
+
+roc_obj <- roc(response = test_data$binary_afib_4yr,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+auc_val <- auc(roc_obj)
+print(auc_val)
+
+
+# 5 year AUC = 0.9902
+test_data$binary_afib_5yr <- NA
+
+for (i in 1:nrow(test_data)) {
+  time_to_afib <- test_data$time_afib[i]
+  afib_event <- test_data$event_afib[i]
+  
+  if (time_to_afib <= 1852 && afib_event == 1) {
+    test_data$binary_afib_5yr[i] <- 1
+  } else {
+    test_data$binary_afib_5yr[i] <- 0
+  }
+}
+
+roc_obj <- roc(response = test_data$binary_afib_5yr,
                predictor = test_data$predicted_risk,
                direction = "<")
 
