@@ -50,12 +50,12 @@ outcome_vars <- c(
 )
 
 predictor_vars <- setdiff(
-  names(data),
+  names(imputed_train_data),
   c("patient_id", "event_afib", "time_afib", outcome_vars)
 )
 
 # Prepare data for training GBM
-boost_data <- as.data.frame(train_data[, c("time_afib", "event_afib", predictor_vars), with = FALSE])
+boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
 # Tuning
 param_grid <- expand.grid(
