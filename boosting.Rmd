@@ -23,7 +23,7 @@ library(glmnet)
 ```
 
 ```{r}
-path <- "../"
+path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025/"
 
 # imputed train data
 filename <- "imputed_train_data.fst"
@@ -153,16 +153,20 @@ gbm_fit <- gbm(
 )
 
 # Select best iteration using cross-validation
-best_iter <- gbm.perf(gbm_fit, method = "cv")
+best_iter <- gbm.perf(gbm_fit, method = "CV")
 
-# Variable importance plot
 importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
-barplot(
-  importance[1:20, "rel.inf"], 
-  names.arg = importance[1:20, "var"],
-  las = 2,
-  main = "Top 20 Variables (GBM Boosting)"
+
+importance_df <- data.frame(
+  Variable = factor(importance[1:10, "var"], levels = rev(importance[1:10, "var"])),
+  Importance = importance[1:10, "rel.inf"]
 )
+
+ggplot(importance_df, aes(x = Variable, y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Variables (GBM Boosting)", x = NULL, y = "Relative Importance") +
+  theme_minimal()
 ```
 
 ```{r}
