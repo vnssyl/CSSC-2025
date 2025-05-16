@@ -136,3 +136,46 @@ roc_obj <- roc(response = test_data$binary_afib_5yr,
 
 auc_val <- auc(roc_obj)
 print(auc_val)
+
+
+# 1 year AUC = 0.9807
+test_data$binary_afib_1yr <- NA
+
+for (i in 1:nrow(test_data)) {
+  time_to_afib <- test_data$time_afib[i]
+  afib_event <- test_data$event_afib[i]
+  
+  if (time_to_afib <= 365 && afib_event == 1) {
+    test_data$binary_afib_1yr[i] <- 1
+  } else {
+    test_data$binary_afib_1yr[i] <- 0
+  }
+}
+
+roc_obj <- roc(response = test_data$binary_afib_1yr,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+auc_val <- auc(roc_obj)
+print(auc_val)
+
+# 2 year AUC = 0.9807
+test_data$binary_afib_2yr <- NA
+
+for (i in 1:nrow(test_data)) {
+  time_to_afib <- test_data$time_afib[i]
+  afib_event <- test_data$event_afib[i]
+  
+  if (time_to_afib <= 730 && afib_event == 1) {
+    test_data$binary_afib_2yr[i] <- 1
+  } else {
+    test_data$binary_afib_2yr[i] <- 0
+  }
+}
+
+roc_obj <- roc(response = test_data$binary_afib_1yr,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+auc_val <- auc(roc_obj)
+print(auc_val)
