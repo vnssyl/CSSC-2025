@@ -12,18 +12,31 @@ library(mice) # for imp
 library(glmnet)
 library(randomForestSRC)
 
-train_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/imputed_train_data.fst")
+path <- "../"
 
-test_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/test_data.fst")
+# imputed train data
+filename <- "imputed_train_data.fst"
+imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
+
+# test data
+filename <- "test_data.fst"
+test_data <- read_fst(paste0(path, filename, sep = ""))
 
 
+outcome_vars <- c(
+  "patient_id", "event_afib", "time_afib"
+)
 
-test_data <- as.data.frame(test_data[, 7:114], with = FALSE)
+predictor_vars <- setdiff(
+  names(imputed_train_data),
+  c(outcome_vars)
+)
 
-train_data <- as.data.frame(train_data[,7:114], with = FALSE)
+# Prepare data for training GBM
+rsf_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
-
-obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
+# Fit model
+obj <- rfsrc(Surv(time_afib,event_afib)~., data = rsf_data)
 
 # print(obj)
 # Sample size: 74722
@@ -67,9 +80,9 @@ plot(jk.obj, xlab = "Variable Importance (x 100)", cex = 1.2)
 
 # Predict risk scores (linear predictor) on test set
 o.pred <- predict(obj, newdata = test_data)
-cc <- complete.cases(test_data)
-test_data$predicted_risk <- NA      # initialize
-test_data$predicted_risk[cc] <- o.pred$predicted
+#cc <- complete.cases(test_data)
+#test_data$predicted_risk <- NA      # initialize
+test_data$predicted_risk <- o.pred$predicted
 
 
 # 6 month AUC = 0.9802
@@ -183,6 +196,5 @@ print(auc_val)
 
 # c index on test data = 0.9847894
 library(nftbart)
-test_data$times <- ifelse(is.na(test_data$predicted_risk),NA, test_data$time_afib)
-test_data$status <- ifelse(is.na(test_data$predicted_risk),NA, test_data$event_afib)
-Cindex(test_data$predicted_risk, test_data$times, test_data$status)
+Cindex(test_data$predicted_risk, test_data$time, test_data$event_afib)
+
