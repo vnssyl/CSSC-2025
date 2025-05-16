@@ -23,14 +23,11 @@ library(glmnet)
 ```
 
 ```{r}
-path <- "../"
+path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025/"
 
 # imputed train data
 filename <- "imputed_train_data.fst"
 imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
-
-filename <- "selected_imputed_train_data.fst"
-selected_train_data <- read_fst(paste0(path, filename, sep = ""))
 
 # test data
 filename <- "test_data.fst"
@@ -41,17 +38,12 @@ test_data <- read_fst(paste0(path, filename, sep = ""))
 
 ```{r}
 outcome_vars <- c(
-  "patient_id", "event_afib", "time_afib",
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
+  "patient_id", "event_afib", "time_afib"
 )
 
 predictor_vars <- setdiff(
   names(imputed_train_data),
-  c("patient_id", "event_afib", "time_afib", outcome_vars)
+  c(outcome_vars)
 )
 
 # Prepare data for training GBM
@@ -119,17 +111,12 @@ print(best_params)
 # ------------------------
 
 outcome_vars <- c(
-  "patient_id", "event_afib", "time_afib",
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
+  "patient_id", "event_afib", "time_afib"
 )
 
 predictor_vars <- setdiff(
   names(imputed_train_data),
-  c("patient_id", "event_afib", "time_afib", outcome_vars)
+  c(outcome_vars)
 )
 
 
@@ -139,13 +126,13 @@ boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 # Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
-  formula = Surv(time_afib, event_afib) ~ demographics_age_index_ecg + creatinine_peri + ecg_resting_qtc + hgb_peri + rdw_peri + chloride_peri + ecg_resting_hr + ecg_resting_pr + plt_peri + potassium_peri + sodium_peri + wbc_peri,
+  formula = Surv(time_afib, event_afib) ~ .,
   data = boost_data,
   distribution = "coxph",
-  n.trees = 3000,
-  interaction.depth = 3,
+  n.trees = 1000,
+  interaction.depth = 1,
   shrinkage = 0.01,
-  bag.fraction = 0.7,
+  bag.fraction = 0.6,
   train.fraction = 0.8,
   cv.folds = 5,
   n.minobsinnode = 10,
@@ -155,14 +142,18 @@ gbm_fit <- gbm(
 # Select best iteration using cross-validation
 best_iter <- gbm.perf(gbm_fit, method = "cv")
 
-# Variable importance plot
 importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
-barplot(
-  importance[1:20, "rel.inf"], 
-  names.arg = importance[1:20, "var"],
-  las = 2,
-  main = "Top 20 Variables (GBM Boosting)"
+
+importance_df <- data.frame(
+  Variable = factor(importance[1:10, "var"], levels = rev(importance[1:10, "var"])),
+  Importance = importance[1:10, "rel.inf"]
 )
+
+ggplot(importance_df, aes(x = Variable, y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Variables (GBM Boosting)", x = NULL, y = "Relative Importance") +
+  theme_minimal()
 ```
 
 ```{r}
@@ -320,5 +311,31 @@ test_data$predicted_class <- ifelse(test_data$predicted_risk >= risk_threshold, 
 
 # Check predictions in a confusion matrix
 table(Predicted = test_data$predicted_class, Actual = test_data$binary_afib_6mo)
+
+```
+C-Index
+```{r}
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+times <- c(180, 365, 730)
+cindexes <- list()
+
+for (time in times){
+  cindex <- UnoC(
+    Surv.rsp = Surv(T_train, delta_train),
+    Surv.rsp.new = Surv(T_test, delta_test),
+    lpnew = lp_test,
+    time = time
+  )
+  name <- paste0(time/365, "-year C-Index")
+  cindexes[[name]] <- cindex
+}
+
+print(cindexes)
+
 
 ```
