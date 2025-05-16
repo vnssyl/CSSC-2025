@@ -36,6 +36,7 @@ predictor_vars <- setdiff(
 rsf_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
 # Fit model
+
 obj <- rfsrc(Surv(time_afib,event_afib)~., data = rsf_data)
 
 # print(obj)
