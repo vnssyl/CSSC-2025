@@ -7,20 +7,26 @@ library(caret)
 library(gbm)
 library(survivalROC)
 library(purrr)
-# library(survAUC) #For calculating C index
+library(survAUC) #For calculating C index
 library(mice) # for imp
 library(glmnet)
 library(randomForestSRC)
+library(pROC)
 
-path <- "../"
+path <- "C:/Users/tanzh/OneDrive/Desktop/case study/"
+
 
 # imputed train data
 filename <- "imputed_train_data.fst"
 imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
 
+imputed_train_data <- imputed_train_data[,1:(length(imputed_train_data)-2)]
+
+
 # test data
 filename <- "test_data.fst"
 test_data <- read_fst(paste0(path, filename, sep = ""))
+test_data <- test_data[,1:(length(test_data)-2)]
 
 
 outcome_vars <- c(
@@ -32,170 +38,77 @@ predictor_vars <- setdiff(
   c(outcome_vars)
 )
 
-# Prepare data for training GBM
+# Prepare data for training
 rsf_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
-# Fit model
 
 obj <- rfsrc(Surv(time_afib,event_afib)~., data = rsf_data)
 
-# print(obj)
-# Sample size: 74722
-# Number of deaths: 4512
+
+print(obj)
+
+# Sample size: 7057
+# Number of events: 6837, 220
 # Number of trees: 500
 # Forest terminal node size: 15
-# Average no. of terminal nodes: 907.582
+# Average no. of terminal nodes: 522.448
 # No. of variables tried at each split: 11
 # Total no. of variables: 106
 # Resampling used to grow trees: swor
-# Resample size used to grow trees: 47224
+# Resample size used to grow trees: 4460
 # Analysis: RSF
-# Family: surv
-# Splitting rule: logrank *random*
+# Family: surv-CR
+# Splitting rule: logrankCR *random*
 #   Number of random split points: 10
-# (OOB) CRPS: 103.15390764
-# (OOB) stand. CRPS: 0.02055268
-# (OOB) Requested performance error: 0.02901516
+# (OOB) Requested performance error: 0.28264857, 0.61284765
 
 
 
-
-# c index
-get.cindex(obj$yvar[,1], obj$yvar[,2], obj$predicted.oob)
-
-get.cindex(obj$yvar[,1], obj$yvar[,2], obj$predicted)
-
-
-# variable importance
-jk.obj <- subsample(obj)
-# pdf("VIMPsur.pdf", width = 15, height = 20)
-par(oma = c(0.5, 10, 0.5, 0.5))
-par(cex.axis = 2.0, cex.lab = 2.0, cex.main = 2.0, mar = c(6.0,17,1,1), mgp = c(4, 1, 0))
-plot(jk.obj, xlab = "Variable Importance (x 100)", cex = 1.2)
-# dev.off()
-
-
-
-
-
-
-# Predict risk scores (linear predictor) on test set
 o.pred <- predict(obj, newdata = test_data)
-#cc <- complete.cases(test_data)
-#test_data$predicted_risk <- NA      # initialize
-test_data$predicted_risk <- o.pred$predicted
+cc <- complete.cases(test_data)
+test_data$predicted <- NA      # initialize
+test_data$predicted[cc] <- o.pred$predicted
+library(timeROC)
+
+TRoc <- timeROC(
+  T       = test_data$time_afib,
+  delta   = test_data$event_afib,
+  marker  = test_data$predicted,
+  cause   = 1,
+  weighting = "marginal",
+  times     = c(182, 365, 730)
+)
 
 
-# 6 month AUC = 0.9802
-test_data$binary_afib_6mo <- NA
+# t=182     t=365     t=730 
+# 0.8846408 0.8848414 0.9134326 
+TRoc$AUC_1 
 
-for (i in 1:nrow(test_data)) {
-  time_to_afib <- test_data$time_afib[i]
-  afib_event <- test_data$event_afib[i]
-  
-  if (time_to_afib <= 182 && afib_event == 1) {
-    test_data$binary_afib_6mo[i] <- 1
-  } else {
-    test_data$binary_afib_6mo[i] <- 0
-  }
+# t=182     t=365     t=730 
+# 0.8855076 0.8859481 0.9145256 
+TRoc$AUC_2
+
+
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted
+
+times <- c(180, 365, 730)
+cindexes <- list()
+
+for (time in times){
+  cindex <- UnoC(
+    Surv.rsp = Surv(T_train, delta_train),
+    Surv.rsp.new = Surv(T_test, delta_test),
+    lpnew = lp_test,
+    time = time
+  )
+  name <- paste0(time/365, "-year C-Index")
+  cindexes[[name]] <- cindex
 }
 
-roc_obj <- roc(response = test_data$binary_afib_6mo,
-               predictor = test_data$predicted_risk,
-               direction = "<")
+print(cindexes)
 
-auc_val <- auc(roc_obj)
-print(auc_val)
-
-
-# 4 year AUC = 0.9891
-test_data$binary_afib_4yr <- NA
-
-for (i in 1:nrow(test_data)) {
-  time_to_afib <- test_data$time_afib[i]
-  afib_event <- test_data$event_afib[i]
-  
-  if (time_to_afib <= 1480 && afib_event == 1) {
-    test_data$binary_afib_4yr[i] <- 1
-  } else {
-    test_data$binary_afib_4yr[i] <- 0
-  }
-}
-
-roc_obj <- roc(response = test_data$binary_afib_4yr,
-               predictor = test_data$predicted_risk,
-               direction = "<")
-
-auc_val <- auc(roc_obj)
-print(auc_val)
-
-
-# 5 year AUC = 0.9902
-test_data$binary_afib_5yr <- NA
-
-for (i in 1:nrow(test_data)) {
-  time_to_afib <- test_data$time_afib[i]
-  afib_event <- test_data$event_afib[i]
-  
-  if (time_to_afib <= 1852 && afib_event == 1) {
-    test_data$binary_afib_5yr[i] <- 1
-  } else {
-    test_data$binary_afib_5yr[i] <- 0
-  }
-}
-
-roc_obj <- roc(response = test_data$binary_afib_5yr,
-               predictor = test_data$predicted_risk,
-               direction = "<")
-
-auc_val <- auc(roc_obj)
-print(auc_val)
-
-
-# 1 year AUC = 0.9807
-test_data$binary_afib_1yr <- NA
-
-for (i in 1:nrow(test_data)) {
-  time_to_afib <- test_data$time_afib[i]
-  afib_event <- test_data$event_afib[i]
-  
-  if (time_to_afib <= 365 && afib_event == 1) {
-    test_data$binary_afib_1yr[i] <- 1
-  } else {
-    test_data$binary_afib_1yr[i] <- 0
-  }
-}
-
-roc_obj <- roc(response = test_data$binary_afib_1yr,
-               predictor = test_data$predicted_risk,
-               direction = "<")
-
-auc_val <- auc(roc_obj)
-print(auc_val)
-
-# 2 year AUC = 0.9807
-test_data$binary_afib_2yr <- NA
-
-for (i in 1:nrow(test_data)) {
-  time_to_afib <- test_data$time_afib[i]
-  afib_event <- test_data$event_afib[i]
-  
-  if (time_to_afib <= 730 && afib_event == 1) {
-    test_data$binary_afib_2yr[i] <- 1
-  } else {
-    test_data$binary_afib_2yr[i] <- 0
-  }
-}
-
-roc_obj <- roc(response = test_data$binary_afib_1yr,
-               predictor = test_data$predicted_risk,
-               direction = "<")
-
-auc_val <- auc(roc_obj)
-print(auc_val)
-
-
-# c index on test data = 0.9847894
-library(nftbart)
-Cindex(test_data$predicted_risk, test_data$time, test_data$event_afib)
 
