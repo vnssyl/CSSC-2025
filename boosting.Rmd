@@ -303,6 +303,37 @@ auc_val <- auc(roc_obj)
 print(auc_val)
 ```
 
+
+
+```{r}
+# Load pROC if not already loaded
+library(pROC)
+
+# Generate ROC curve
+roc_obj <- roc(response = test_data$binary_afib_6mo,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+# Find the best threshold using Youden's J statistic
+best_coords <- coords(roc_obj, x = "best", best.method = "youden", transpose = FALSE)
+
+# Extract the threshold
+best_threshold <- best_coords["threshold"]
+
+# Print threshold and performance
+best_threshold
+
+risk_threshold <- best_coords["threshold"][[1]] 
+test_data$predicted_class <- ifelse(test_data$predicted_risk >= risk_threshold, 1, 0)
+
+# Check predictions in a confusion matrix
+table(Predicted = test_data$predicted_class, Actual = test_data$binary_afib_6mo)
+```
+
+
+
+
+
 C-Index
 ```{r}
 T_train <- imputed_train_data$time_afib
@@ -326,7 +357,5 @@ for (time in times){
 }
 
 print(cindexes)
-
-
 ```
 
