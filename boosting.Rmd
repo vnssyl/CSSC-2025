@@ -153,7 +153,7 @@ gbm_fit <- gbm(
 )
 
 # Select best iteration using cross-validation
-best_iter <- gbm.perf(gbm_fit, method = "CV")
+best_iter <- gbm.perf(gbm_fit, method = "cv")
 
 importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
 
