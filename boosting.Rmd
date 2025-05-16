@@ -311,3 +311,31 @@ roc_obj <- roc(response = test_data$binary_afib_6mo,
 auc_val <- auc(roc_obj)
 print(auc_val)
 ```
+
+C-Index
+```{r}
+T_train <- imputed_train_data$time_afib
+delta_train <- imputed_train_data$event_afib
+T_test <- test_data$time_afib
+delta_test <- test_data$event_afib
+lp_test <- test_data$predicted_risk
+
+times <- c(180, 365, 730)
+cindexes <- list()
+
+for (time in times){
+  cindex <- UnoC(
+    Surv.rsp = Surv(T_train, delta_train),
+    Surv.rsp.new = Surv(T_test, delta_test),
+    lpnew = lp_test,
+    time = time
+  )
+  name <- paste0(time/365, "-year C-Index")
+  cindexes[[name]] <- cindex
+}
+
+print(cindexes)
+
+
+```
+
