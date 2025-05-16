@@ -35,6 +35,7 @@ predictor_vars <- setdiff(
 # Prepare data for training GBM
 rsf_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
+# Fit model
 
 obj <- rfsrc(Surv(time_afib,event_afib)~., data = rsf_data)
 
@@ -80,9 +81,9 @@ plot(jk.obj, xlab = "Variable Importance (x 100)", cex = 1.2)
 
 # Predict risk scores (linear predictor) on test set
 o.pred <- predict(obj, newdata = test_data)
-cc <- complete.cases(test_data)
-test_data$predicted_risk <- NA      # initialize
-test_data$predicted_risk[cc] <- o.pred$predicted
+#cc <- complete.cases(test_data)
+#test_data$predicted_risk <- NA      # initialize
+test_data$predicted_risk <- o.pred$predicted
 
 
 # 6 month AUC = 0.9802
@@ -196,6 +197,5 @@ print(auc_val)
 
 # c index on test data = 0.9847894
 library(nftbart)
-test_data$times <- ifelse(is.na(test_data$predicted_risk),NA, test_data$time_afib)
-test_data$status <- ifelse(is.na(test_data$predicted_risk),NA, test_data$event_afib)
-Cindex(test_data$predicted_risk, test_data$times, test_data$status)
+Cindex(test_data$predicted_risk, test_data$time, test_data$event_afib)
+
