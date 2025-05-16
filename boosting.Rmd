@@ -29,9 +29,6 @@ path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025/"
 filename <- "imputed_train_data.fst"
 imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
 
-filename <- "selected_imputed_train_data.fst"
-selected_train_data <- read_fst(paste0(path, filename, sep = ""))
-
 # test data
 filename <- "test_data.fst"
 test_data <- read_fst(paste0(path, filename, sep = ""))
@@ -41,17 +38,12 @@ test_data <- read_fst(paste0(path, filename, sep = ""))
 
 ```{r}
 outcome_vars <- c(
-  "patient_id", "event_afib", "time_afib",
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
+  "patient_id", "event_afib", "time_afib"
 )
 
 predictor_vars <- setdiff(
   names(imputed_train_data),
-  c("patient_id", "event_afib", "time_afib", outcome_vars)
+  c(outcome_vars)
 )
 
 # Prepare data for training GBM
@@ -119,17 +111,12 @@ print(best_params)
 # ------------------------
 
 outcome_vars <- c(
-  "patient_id", "event_afib", "time_afib",
-  "outcome_afib_aflutter_new_post",
-  "time_to_outcome_afib_aflutter_new_post",
-  "outcome_all_cause_death",
-  "time_to_outcome_all_cause_death",
-  "follow_up_duration"
+  "patient_id", "event_afib", "time_afib"
 )
 
 predictor_vars <- setdiff(
   names(imputed_train_data),
-  c("patient_id", "event_afib", "time_afib", outcome_vars)
+  c(outcome_vars)
 )
 
 
