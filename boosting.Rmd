@@ -199,8 +199,8 @@ test_data$predicted_risk <- predicted_risk
 
 #Performance Scores
 ```{r}
-#4 year
-eval_time <- 1480
+#1 year
+eval_time <- 365
 
 T_train <- imputed_train_data$time_afib
 delta_train <- imputed_train_data$event_afib
@@ -217,8 +217,8 @@ auc_uno <- AUC.uno(
 )
 str(auc_uno)
 
-#5 year
-eval_time <- 1825
+#2 year
+eval_time <- 730
 T_train <- imputed_train_data$time_afib
 delta_train <- imputed_train_data$event_afib
 
@@ -267,26 +267,26 @@ auc_6mo <- AUC.uno(
   times = 182
 )
 
-# 4-year AUC
-auc_4yr <- AUC.uno(
+# 1-year AUC
+auc_1yr <- AUC.uno(
   Surv.rsp = Surv(T_train, delta_train),
   Surv.rsp.new = Surv(T_test, delta_test),
   lpnew = lp_test,
-  times = 1480
+  times = 365
 )
 
-# 5-year AUC
-auc_5yr <- AUC.uno(
+# 2-year AUC
+auc_2yr <- AUC.uno(
   Surv.rsp = Surv(T_train, delta_train),
   Surv.rsp.new = Surv(T_test, delta_test),
   lpnew = lp_test,
-  times = 1825
+  times = 730
 )
 
 # Print AUC values
 cat("6-month AUC:", auc_6mo$auc, "\n")
-cat("4-year AUC:", auc_4yr$auc, "\n")
-cat("5-year AUC:", auc_5yr$auc, "\n")
+cat("1-year AUC:", auc_1yr$auc, "\n")
+cat("2-year AUC:", auc_2yr$auc, "\n")
 ```
 
 # This is ROC-AUC similar to what was reported in the papers
