@@ -20,13 +20,11 @@ path <- "C:/Users/tanzh/OneDrive/Desktop/case study/"
 filename <- "imputed_train_data.fst"
 imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
 
-imputed_train_data <- imputed_train_data[,1:(length(imputed_train_data)-2)]
 
 
 # test data
 filename <- "test_data.fst"
 test_data <- read_fst(paste0(path, filename, sep = ""))
-test_data <- test_data[,1:(length(test_data)-2)]
 
 
 outcome_vars <- c(
