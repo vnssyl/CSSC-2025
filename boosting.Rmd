@@ -311,3 +311,14 @@ roc_obj <- roc(response = test_data$binary_afib_6mo,
 auc_val <- auc(roc_obj)
 print(auc_val)
 ```
+
+
+##Simple classification code using risk threshold
+```{r}
+risk_threshold <- 0.5
+test_data$predicted_class <- ifelse(test_data$predicted_risk >= risk_threshold, 1, 0)
+
+# Check predictions in a confusion matrix
+table(Predicted = test_data$predicted_class, Actual = test_data$binary_afib_6mo)
+
+```
