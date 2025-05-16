@@ -179,3 +179,10 @@ roc_obj <- roc(response = test_data$binary_afib_1yr,
 
 auc_val <- auc(roc_obj)
 print(auc_val)
+
+
+# c index on test data = 0.9847894
+library(nftbart)
+test_data$times <- ifelse(is.na(test_data$predicted_risk),NA, test_data$time_afib)
+test_data$status <- ifelse(is.na(test_data$predicted_risk),NA, test_data$event_afib)
+Cindex(test_data$predicted_risk, test_data$times, test_data$status)
