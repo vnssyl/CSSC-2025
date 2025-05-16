@@ -2,6 +2,7 @@ library(tidyverse)
 library(glmnet)
 library(survival)
 library(data.table)
+library(dplyr)
 
 # load original dataset
 path <- "../"
@@ -137,6 +138,8 @@ imputed_train_data <- complete(imputed_train_data, 1)
 # selected_data <- imputed_train_data[ , names(imputed_train_data) %in% selected_all]
 
 # write prepared train and test data
+imputed_train_data <- imputed_train_data %>% select(-c(follow_up_duration,outcome_all_cause_death))
 write_fst(imputed_train_data, paste0(path, "imputed_train_data.fst", sep = ""))
-#write_fst(selected_data, paste0(path, "selected_imputed_train_data.fst", sep = ""))
+
+test_data <- test_data %>% select(-c(follow_up_duration,outcome_all_cause_death))
 write_fst(test_data, paste0(path, "test_data.fst", sep = ""))
