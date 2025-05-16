@@ -12,18 +12,31 @@ library(mice) # for imp
 library(glmnet)
 library(randomForestSRC)
 
-train_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/imputed_train_data.fst")
+path <- "../"
 
-test_data <- read_fst("C:/Users/tanzh/OneDrive/Desktop/case study/test_data.fst")
+# imputed train data
+filename <- "imputed_train_data.fst"
+imputed_train_data <- read_fst(paste0(path, filename, sep = ""))
+
+# test data
+filename <- "test_data.fst"
+test_data <- read_fst(paste0(path, filename, sep = ""))
 
 
+outcome_vars <- c(
+  "patient_id", "event_afib", "time_afib"
+)
 
-test_data <- as.data.frame(test_data[, 7:114], with = FALSE)
+predictor_vars <- setdiff(
+  names(imputed_train_data),
+  c(outcome_vars)
+)
 
-train_data <- as.data.frame(train_data[,7:114], with = FALSE)
+# Prepare data for training GBM
+rsf_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 
 
-obj <- rfsrc(Surv(time_afib,event_afib)~., data = train_data)
+obj <- rfsrc(Surv(time_afib,event_afib)~., data = rsf_data)
 
 # print(obj)
 # Sample size: 74722
