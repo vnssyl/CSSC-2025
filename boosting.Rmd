@@ -139,13 +139,13 @@ boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 # Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
-  formula = Surv(time_afib, event_afib) ~ demographics_age_index_ecg + creatinine_peri + ecg_resting_qtc + hgb_peri + rdw_peri + chloride_peri + ecg_resting_hr + ecg_resting_pr + plt_peri + potassium_peri + sodium_peri + wbc_peri,
+  formula = Surv(time_afib, event_afib) ~ .,
   data = boost_data,
   distribution = "coxph",
-  n.trees = 3000,
-  interaction.depth = 3,
+  n.trees = 1000,
+  interaction.depth = 1,
   shrinkage = 0.01,
-  bag.fraction = 0.7,
+  bag.fraction = 0.6,
   train.fraction = 0.8,
   cv.folds = 5,
   n.minobsinnode = 10,
