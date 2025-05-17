@@ -13,7 +13,7 @@ library(glmnet)
 library(randomForestSRC)
 library(pROC)
 
-path <- "C:/Users/tanzh/OneDrive/Desktop/case study/"
+path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025"
 
 
 # imputed train data

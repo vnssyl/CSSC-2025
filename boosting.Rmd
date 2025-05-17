@@ -126,7 +126,11 @@ boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
 # Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
-  formula = Surv(time_afib, event_afib) ~ .,
+  formula = Surv(time_afib, event_afib) ~ . - outcome_afib_aflutter_new_post 
+                                           - time_to_outcome_afib_aflutter_new_post 
+                                           - outcome_all_cause_death 
+                                           - time_to_outcome_all_cause_death 
+                                           - follow_up_duration,
   data = boost_data,
   distribution = "coxph",
   n.trees = 1000,
@@ -188,61 +192,7 @@ test_data$predicted_risk <- predicted_risk
 ```
 
 
-#Performance Scores
-```{r}
-#1 year
-eval_time <- 365
-
-T_train <- imputed_train_data$time_afib
-delta_train <- imputed_train_data$event_afib
-
-T_test <- test_data$time_afib
-delta_test <- test_data$event_afib
-lp_test <- test_data$predicted_risk
-
-auc_uno <- AUC.uno(
-  Surv.rsp = Surv(T_train, delta_train),    # training survival object
-  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
-  lpnew = lp_test,                          # predicted risk (linear predictor)
-  times = eval_time                         # time at which to evaluate
-)
-str(auc_uno)
-
-#2 year
-eval_time <- 730
-T_train <- imputed_train_data$time_afib
-delta_train <- imputed_train_data$event_afib
-
-T_test <- test_data$time_afib
-delta_test <- test_data$event_afib
-lp_test <- test_data$predicted_risk
-
-auc_uno <- AUC.uno(
-  Surv.rsp = Surv(T_train, delta_train),    # training survival object
-  Surv.rsp.new = Surv(T_test, delta_test),  # testing survival object
-  lpnew = lp_test,                          # predicted risk (linear predictor)
-  times = eval_time                         # time at which to evaluate
-)
-str(auc_uno)
-
-#6 months
-eval_time <- 182
-T_train <- imputed_train_data$time_afib
-delta_train <- imputed_train_data$event_afib
-
-T_test <- test_data$time_afib
-delta_test <- test_data$event_afib
-lp_test <- test_data$predicted_risk
-
-auc_uno <- AUC.uno(
-  Surv.rsp = Surv(T_train, delta_train),
-  Surv.rsp.new = Surv(T_test, delta_test),
-  lpnew = lp_test,
-  times = eval_time
-)
-str(auc_uno)
-```
-# Formatted nicer
+# Performance Scores
 ```{r}
 T_train <- imputed_train_data$time_afib
 delta_train <- imputed_train_data$event_afib
@@ -303,6 +253,37 @@ auc_val <- auc(roc_obj)
 print(auc_val)
 ```
 
+
+
+```{r}
+# Load pROC if not already loaded
+library(pROC)
+
+# Generate ROC curve
+roc_obj <- roc(response = test_data$binary_afib_6mo,
+               predictor = test_data$predicted_risk,
+               direction = "<")
+
+# Find the best threshold using Youden's J statistic
+best_coords <- coords(roc_obj, x = "best", best.method = "youden", transpose = FALSE)
+
+# Extract the threshold
+best_threshold <- best_coords["threshold"]
+
+# Print threshold and performance
+best_threshold
+
+risk_threshold <- best_coords["threshold"][[1]] 
+test_data$predicted_class <- ifelse(test_data$predicted_risk >= risk_threshold, 1, 0)
+
+# Check predictions in a confusion matrix
+table(Predicted = test_data$predicted_class, Actual = test_data$binary_afib_6mo)
+```
+
+
+
+
+
 C-Index
 ```{r}
 T_train <- imputed_train_data$time_afib
@@ -326,7 +307,5 @@ for (time in times){
 }
 
 print(cindexes)
-
-
 ```
 
