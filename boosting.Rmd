@@ -23,7 +23,7 @@ library(glmnet)
 ```
 
 ```{r}
-path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025/"
+path <- "../"
 
 # imputed train data
 filename <- "imputed_train_data.fst"
@@ -122,15 +122,12 @@ predictor_vars <- setdiff(
 
 # Prepare data for training GBM
 boost_data <- imputed_train_data[, c("time_afib", "event_afib", predictor_vars)]
+boost_data$event_afib <- as.integer(as.character(boost_data$event_afib))
 
 # Fit GBM Cox model
 set.seed(123)
 gbm_fit <- gbm(
-  formula = Surv(time_afib, event_afib) ~ . - outcome_afib_aflutter_new_post 
-                                           - time_to_outcome_afib_aflutter_new_post 
-                                           - outcome_all_cause_death 
-                                           - time_to_outcome_all_cause_death 
-                                           - follow_up_duration,
+  formula = Surv(time_afib, event_afib) ~ .,
   data = boost_data,
   distribution = "coxph",
   n.trees = 1000,
@@ -145,7 +142,9 @@ gbm_fit <- gbm(
 
 # Select best iteration using cross-validation
 best_iter <- gbm.perf(gbm_fit, method = "cv")
+```
 
+```{r}
 importance <- summary(gbm_fit, n.trees = best_iter, plotit = FALSE)
 
 importance_df <- data.frame(
@@ -153,12 +152,30 @@ importance_df <- data.frame(
   Importance = importance[1:10, "rel.inf"]
 )
 
-ggplot(importance_df, aes(x = Variable, y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+name_lookup <- c(
+  ecg_resting_qtc = "ECG QTc Interval",
+  creatinine_peri = "Creatinine (Peri)",
+  demographics_age_index_ecg = "Age (ECG Index)",
+  sodium_peri = "Sodium (Peri)",
+  potassium_peri = "Potassium (Peri)",
+  rdw_peri = "RDW (Peri)",
+  beta_blocker_any_peri = "Beta Blocker (Any, Peri)",
+  glucose_insulin_peri = "Glucose/Insulin (Peri)",
+  chloride_peri = "Chloride (Peri)",
+  hgb_peri = "Hemoglobin (Peri)"
+)
+
+importance_df$Label <- name_lookup[as.character(importance_df$Variable)]
+importance_df$Label <- factor(importance_df$Label, levels = rev(name_lookup[as.character(importance_df$Variable)]))
+
+
+ggplot(importance_df, aes(x = Label, y = Importance)) +
+  geom_bar(stat = "identity", fill = "#6d9eebff") +
   coord_flip() +
   labs(title = "Top 10 Variables (GBM Boosting)", x = NULL, y = "Relative Importance") +
   theme_minimal()
 ```
+
 
 ```{r}
 # ------------------------
