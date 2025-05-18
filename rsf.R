@@ -13,7 +13,7 @@ library(glmnet)
 library(randomForestSRC)
 library(pROC)
 
-path <- "C:/Users/johny/OneDrive/Desktop/competition/CSSC-2025"
+path <- "../"
 
 
 # imputed train data
@@ -61,11 +61,17 @@ print(obj)
 # (OOB) Requested performance error: 0.28264857, 0.61284765
 
 
+expected_vars <- obj$forest$xvar.names
+cc <- complete.cases(test_data[, expected_vars, drop = FALSE])
+test_rsf_data <- test_data[cc, expected_vars, drop = FALSE]
+test_rsf_data <- test_rsf_data[complete.cases(test_rsf_data), ]
 
-o.pred <- predict(obj, newdata = test_data)
-cc <- complete.cases(test_data)
-test_data$predicted <- NA      # initialize
-test_data$predicted[cc] <- o.pred$predicted
+o.pred <- predict(obj, newdata = test_rsf_data)
+
+test_rsf_data$predicted <- NA
+test_rsf_data$predicted <- o.pred$predicted
+
+# AUC calculations
 library(timeROC)
 
 TRoc <- timeROC(
@@ -79,11 +85,11 @@ TRoc <- timeROC(
 
 
 # t=182     t=365     t=730 
-# 0.8846408 0.8848414 0.9134326 
+# 0.8086806 0.8118263 0.8416176 
 TRoc$AUC_1 
 
 # t=182     t=365     t=730 
-# 0.8855076 0.8859481 0.9145256 
+# 0.8098108 0.8132447 0.8431505  
 TRoc$AUC_2
 
 
@@ -93,14 +99,14 @@ T_test <- test_data$time_afib
 delta_test <- test_data$event_afib
 lp_test <- test_data$predicted
 
-times <- c(180, 365, 730)
+times <- c(182, 365, 730)
 cindexes <- list()
 
 for (time in times){
   cindex <- UnoC(
     Surv.rsp = Surv(T_train, delta_train),
-    Surv.rsp.new = Surv(T_test, delta_test),
-    lpnew = lp_test,
+    Surv.rsp.new = Surv(T_test[cc], delta_test[cc]),
+    lpnew = lp_test[cc],
     time = time
   )
   name <- paste0(time/365, "-year C-Index")
@@ -109,4 +115,5 @@ for (time in times){
 
 print(cindexes)
 
+# confusion matrix
 
