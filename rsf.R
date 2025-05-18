@@ -69,7 +69,7 @@ o.pred <- predict(obj, newdata = test_rsf_data)
 
 # Assign predictions correctly
 test_data$predicted <- NA
-test_data$predicted[which(cc)] <- o.pred$predicted[,2]
+test_data$predicted[which(cc)] <- o.pred$predicted[,1]
 
 # AUC calculations
 library(timeROC)
