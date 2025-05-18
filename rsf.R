@@ -63,13 +63,13 @@ print(obj)
 
 expected_vars <- obj$forest$xvar.names
 cc <- complete.cases(test_data[, expected_vars, drop = FALSE])
-test_rsf_data <- test_data[cc, expected_vars, drop = FALSE]
-test_rsf_data <- test_rsf_data[complete.cases(test_rsf_data), ]
+test_rsf_data <- test_data[cc_final, expected_vars, drop = FALSE]
 
 o.pred <- predict(obj, newdata = test_rsf_data)
 
-test_rsf_data$predicted <- NA
-test_rsf_data$predicted <- o.pred$predicted
+# Assign predictions correctly
+test_data$predicted <- NA
+test_data$predicted[which(cc)] <- o.pred$predicted[,2]
 
 # AUC calculations
 library(timeROC)
