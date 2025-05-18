@@ -105,14 +105,23 @@ cindexes <- list()
 for (time in times){
   cindex <- UnoC(
     Surv.rsp = Surv(T_train, delta_train),
-    Surv.rsp.new = Surv(T_test[cc], delta_test[cc]),
-    lpnew = lp_test[cc],
+    Surv.rsp.new = Surv(T_test[which(cc)], delta_test[which(cc)]),
+    lpnew = -lp_test[which(cc)],
     time = time
   )
   name <- paste0(time/365, "-year C-Index")
   cindexes[[name]] <- cindex
 }
 
+
+# $`0.498630136986301-year C-Index`
+# [1] 0.8758847
+# 
+# $`1-year C-Index`
+# [1] 0.7882033
+# 
+# $`2-year C-Index`
+# [1] 0.9511507
 print(cindexes)
 
 # confusion matrix
