@@ -124,5 +124,25 @@ for (time in times){
 # [1] 0.9511507
 print(cindexes)
 
-# confusion matrix
+pred <- test_data$predicted[which(cc)]
+true <- test_data$event_afib[which(cc)]
 
+# confusion matrix
+roc_obj <- roc(response = true,
+               predictor = -pred,
+               direction = "<")
+
+# Find the best threshold using Youden's J statistic
+best_coords <- coords(roc_obj, x = "best", best.method = "youden", transpose = FALSE)
+
+# Extract the threshold
+best_threshold <- best_coords["threshold"]
+
+# Print threshold and performance
+best_threshold
+
+risk_threshold <- best_coords["threshold"][[1]] 
+test_data$predicted_class[which(cc)] <- ifelse(-pred >= risk_threshold, 1, 0)
+
+# Check predictions in a confusion matrix
+table(Predicted = test_data$predicted_class[which(cc)], Actual = true)
